@@ -14,8 +14,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Build release
         run: |
@@ -32,13 +30,15 @@ jobs:
 
       - name: Create archive
         run: |
-          cd .build/release
-          zip -r event-macos-${{ steps.arch.outputs.suffix }}.zip event
+          mkdir -p archive
+          cp .build/release/event archive/
+          # Create bottle (tar.gz)
+          tar -czvf event--${{ steps.arch.outputs.suffix }}.tar.gz -C archive .
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: .build/release/event-macos-${{ steps.arch.outputs.suffix }}.zip
+          files: event--${{ steps.arch.outputs.suffix }}.tar.gz
           generate_release_notes: true
           body: |
             ## Installation
@@ -53,3 +53,91 @@ jobs:
             ```bash
             swift build -c release
             ```
+
+  update-homebrew:
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - name: Download release asset
+        run: |
+          gh release download v0.1.0 --pattern "*.tar.gz"
+
+      - name: Setup Homebrew
+        run: |
+          # Install Homebrew if not exists
+          if ! command -v brew &> /dev/null; then
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          fi
+
+      - name: Create bottle
+        run: |
+          # Determine arch
+          if [ "$(uname -m)" = "arm64" ]; then
+            ARCH="arm64"
+          else
+            ARCH="x86_64"
+          fi
+
+          # Create bottle directory structure
+          mkdir -p $(brew --prefix)/Cellar/event/0.1.0
+          tar -xzf event--${ARCH}.tar.gz -C $(brew --prefix)/Cellar/event/0.1.0
+
+          # Create bottle
+          cd $(brew --prefix)/Cellar
+          tar -czvf /tmp/event--${ARCH}.bottle.tar.gz event/0.1.0
+
+      - name: Calculate SHA256
+        id: sha
+        run: |
+          if [ "$(uname -m)" = "arm64" ]; then
+            SHA=$(shasum -a 256 /tmp/event--arm64.bottle.tar.gz | cut -d' ' -f1)
+            echo "sha256_arm64=$SHA" >> $GITHUB_OUTPUT
+          else
+            SHA=$(shasum -a 256 /tmp/event--x86_64.bottle.tar.gz | cut -d' ' -f1)
+            echo "sha256_x86_64=$SHA" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Homebrew tap
+        run: |
+          # Clone brew tap repo
+          git clone https://github.com/FradSer/brew.git homebrew-tap
+          cd homebrew-tap
+
+          # Update formula with bottle
+          cat > Formula/event.rb << 'RUBY'
+          class Event < Formula
+            desc "CLI tool for managing Apple Reminders and Calendar via EventKit"
+            homepage "https://github.com/FradSer/event"
+            version "0.1.0"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                sha256 "SHA256_ARM64" => :big_sur
+              end
+              on_intel do
+                sha256 "SHA256_X86_64" => :big_sur
+              end
+            end
+
+            def install
+              bin.install "event"
+            end
+
+            test do
+              system "#{bin}/event", "--help"
+            end
+          end
+          RUBY
+
+          # Replace SHA256 placeholders
+          sed -i '' "s/SHA256_ARM64/${{ steps.sha.outputs.sha256_arm64 }}/g" Formula/event.rb
+          sed -i '' "s/SHA256_X86_64/${{ steps.sha.outputs.sha256_x86_64 }}/g" Formula/event.rb
+
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add Formula/event.rb
+          git commit -m "Update event to v0.1.0 with bottle"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

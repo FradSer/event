@@ -2,7 +2,7 @@
 
 一个纯 Swift 编写的 CLI 工具，用于管理 macOS 上的 Apple 提醒事项和日历。
 
-[English Version](./README.md)
+[English](README.md) | 简体中文
 
 ## 功能特性
 

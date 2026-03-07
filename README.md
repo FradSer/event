@@ -2,7 +2,7 @@
 
 A pure Swift CLI tool for managing Apple Reminders and Calendar on macOS.
 
-[中文版](./README.zh-CN.md)
+English | [简体中文](README.zh-CN.md)
 
 ## Features
 

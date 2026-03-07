@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - platform: macos-latest
+            arch: arm64
+            suffix: arm64
+          - platform: macos-latest
+            arch: x86_64
+            suffix: x86_64
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build release
+        run: |
+          swift build -c release
+
+      - name: Create archive
+        run: |
+          cd .build/release
+          zip -r event-macos-${{ matrix.suffix }}.zip event
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: .build/release/event-macos-${{ matrix.suffix }}.zip
+          generate_release_notes: true
+
+  create-homebrew-tap:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all assets
+        run: |
+          gh release download --pattern "*.zip" --dir release-assets
+
+      - name: Calculate SHA256
+        run: |
+          echo "```ruby" >> homebrew-formula.rb
+          echo "class Event < Formula" >> homebrew-formula.rb
+          echo '  desc "CLI tool for managing Apple Reminders and Calendar via EventKit"' >> homebrew-formula.rb
+          echo '  homepage "https://github.com/FradSer/event"' >> homebrew-formula.rb
+          echo '  url "https://github.com/FradSer/event/archive/refs/tags/${{ github.ref_name }}.tar.gz"' >> homebrew-formula.rb
+          sha256=$(openssl dgst -sha256 release-assets/event-macos-arm64.zip | sed 's/^.* //')
+          echo "  sha256 \"$sha256\"  # arm64" >> homebrew-formula.rb
+          sha256=$(openssl dgst -sha256 release-assets/event-macos-x86_64.zip | sed 's/^.* //')
+          echo "  sha256 \"$sha256\"  # x86_64" >> homebrew-formula.rb
+          echo '  version "'${{ github.ref_name }}'"' >> homebrew-formula.rb
+          echo '  license "MIT"' >> homebrew-formula.rb
+          echo "" >> homebrew-formula.rb
+          echo '  depends_on swift: :build' >> homebrew-formula.rb
+          echo "" >> homebrew-formula.rb
+          echo '  def install' >> homebrew-formula.rb
+          echo '    system "swift", "build", "-c", "release", "--disable-sandbox"' >> homebrew-formula.rb
+          echo '    bin.install ".build/release/event"' >> homebrew-formula.rb
+          echo '  end' >> homebrew-formula.rb
+          echo "" >> homebrew-formula.rb
+          echo '  test do' >> homebrew-formula.rb
+          echo '    system "#{bin}/event", "--help"' >> homebrew-formula.rb
+          echo '  end' >> homebrew-formula.rb
+          echo 'end' >> homebrew-formula.rb
+          echo "```" >> homebrew-formula.rb
+          cat homebrew-formula.rb
+
+      - name: Post SHA256 as release note
+        run: |
+          gh release edit ${{ github.ref_name }} --notes-file - << 'EOF'
+## Homebrew Installation
+
+### Using Tap (Recommended)
+```bash
+brew tap FradSer/event
+brew install event
+```
+
+### Using Directly
+```bash
+brew install FradSer/event
+```
+
+### Manual Installation
+1. Download the zip file for your architecture from the assets
+2. Extract and run:
+   ```bash
+   unzip event-macos-*.zip
+   ./event --help
+   ```
+EOF
+
+      - name: Upload Homebrew formula
+        uses: softprops/action-gh-release@v2
+        with:
+          files: homebrew-formula.rb

@@ -22,12 +22,11 @@ actor ListService {
         let calendar = EKCalendar(for: .reminder, eventStore: eventStore)
         calendar.title = name
 
-        // Find the default source for reminders
-        guard
-            let source = eventStore.sources.first(where: {
-                $0.sourceType == .local || $0.sourceType == .calDAV
-            })
-        else {
+        // Find a source that actually supports reminders (has existing reminder calendars)
+        let existingReminderCalendars = eventStore.calendars(for: .reminder)
+        let validSources = Set(existingReminderCalendars.map { $0.source })
+
+        guard let source = validSources.first else {
             throw EventCLIError.eventKitError("No suitable source found for creating reminder list")
         }
         calendar.source = source

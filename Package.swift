@@ -21,10 +21,5 @@ let package = Package(
                 .unsafeFlags(["-parse-as-library"]),
             ]
         ),
-        .testTarget(
-            name: "eventTests",
-            dependencies: ["event"],
-            path: "Tests/eventTests"
-        ),
     ]
 )

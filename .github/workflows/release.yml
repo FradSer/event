@@ -23,9 +23,8 @@ jobs:
 
       - name: Create archive
         run: |
-          mkdir -p archive
-          cp .build/release/event archive/
-          zip -r event-macos.zip archive
+          cp .build/release/event ./
+          zip -r event-macos.zip event
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2

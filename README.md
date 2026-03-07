@@ -29,7 +29,7 @@ English | [简体中文](README.zh-CN.md)
 
 ```bash
 # Add tap
-brew tap FradSer/event
+brew tap FradSer/brew
 
 # Install
 brew install event

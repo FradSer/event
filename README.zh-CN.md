@@ -29,7 +29,7 @@
 
 ```bash
 # 添加 tap
-brew tap FradSer/event
+brew tap FradSer/brew
 
 # 安装
 brew install event

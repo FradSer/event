@@ -1,5 +1,10 @@
 # event
 
+[![Swift](https://img.shields.io/badge/Swift-5.9+-F05138?style=flat&logo=swift)](https://swift.org)
+[![macOS](https://img.shields.io/badge/macOS-14.0+-000000?style=flat&logo=apple)](https://www.apple.com/macos)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Twitter Follow](https://img.shields.io/twitter/follow/FradSer?style=social)](https://twitter.com/FradSer)
+
 一个纯 Swift 编写的 CLI 工具，用于管理 macOS 上的 Apple 提醒事项和日历。
 
 [English](README.md) | 简体中文

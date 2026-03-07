@@ -1,5 +1,10 @@
 # event
 
+[![Swift](https://img.shields.io/badge/Swift-5.9+-F05138?style=flat&logo=swift)](https://swift.org)
+[![macOS](https://img.shields.io/badge/macOS-14.0+-000000?style=flat&logo=apple)](https://www.apple.com/macos)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Twitter Follow](https://img.shields.io/twitter/follow/FradSer?style=social)](https://twitter.com/FradSer)
+
 A pure Swift CLI tool for managing Apple Reminders and Calendar on macOS.
 
 English | [简体中文](README.zh-CN.md)

@@ -56,33 +56,30 @@ struct ReminderCommands: AsyncParsableCommand {
         @Option(name: .shortAndLong, help: "Notes")
         var notes: String?
 
+        @Option(name: .shortAndLong, help: "URL")
+        var url: String?
+
         @Option(help: "Comma-separated tags")
         var tags: String?
 
-        @Option(help: "Comma-separated subtasks")
-        var subtasks: String?
+        @Option(help: "Parent reminder title (for creating subtasks via Shortcut)")
+        var parentTitle: String?
 
         @Flag(help: "Output in JSON format")
         var json = false
 
         func run() async throws {
             let service = ReminderService()
-            let tagArray = tags?.components(separatedBy: ",").map {
-                $0.trimmingCharacters(in: .whitespaces)
-            }
-
-            let subtaskArray = subtasks?.components(separatedBy: ",").map {
-                $0.trimmingCharacters(in: .whitespaces)
-            }
 
             let reminder = try await service.createReminder(
                 title: title,
                 listName: list,
                 notes: notes,
+                url: url,
                 dueDate: due,
                 priority: priority,
-                tags: tagArray,
-                subtasks: subtaskArray
+                tags: tags,
+                parentTitle: parentTitle
             )
 
             let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
@@ -116,14 +113,17 @@ struct ReminderCommands: AsyncParsableCommand {
         @Option(help: "Comma-separated tags")
         var tags: String?
 
+        @Option(name: .shortAndLong, help: "New URL")
+        var url: String?
+
+        @Option(help: "Parent reminder title (for converting to subtask)")
+        var parentTitle: String?
+
         @Flag(help: "Output in JSON format")
         var json = false
 
         func run() async throws {
             let service = ReminderService()
-            let tagArray = tags?.components(separatedBy: ",").map {
-                $0.trimmingCharacters(in: .whitespaces)
-            }
 
             let reminder = try await service.updateReminder(
                 id: id,
@@ -132,7 +132,9 @@ struct ReminderCommands: AsyncParsableCommand {
                 notes: notes,
                 dueDate: due,
                 priority: priority,
-                tags: tagArray
+                tags: tags,
+                url: url,
+                parentTitle: parentTitle
             )
 
             let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()

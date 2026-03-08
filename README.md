@@ -61,6 +61,16 @@ Alternatively, you can manually enable permissions in System Settings:
 - System Settings > Privacy & Security > Reminders > Enable Terminal (or your shell)
 - System Settings > Privacy & Security > Calendars > Enable Terminal
 
+## Agent Skill
+
+The `apple-events` skill now lives in the [`FradSer/skills`](https://github.com/FradSer/skills) repository and lets AI agents manage your Apple Reminders and Calendar through `event`.
+
+1. Ensure the `event` CLI is installed and in your system PATH (e.g., `/usr/local/bin/event`).
+2. Install the `apple-events` skill from the skills repository:
+   ```bash
+   npx skills add https://github.com/FradSer/skills --skill apple-events
+   ```
+
 ## Usage
 
 ```bash

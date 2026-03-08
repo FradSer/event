@@ -61,7 +61,17 @@ cp .build/release/event /usr/local/bin/
 - 系统设置 > 隐私与安全性 > 提醒事项 > 启用「终端」（或你的 Shell）
 - 系统设置 > 隐私与安全性 > 日历 > 启用「终端」
 
-## 许可证
+## Agent Skill
+
+`apple-events` skill 现已迁移到 [`FradSer/skills`](https://github.com/FradSer/skills) 仓库中，可让 AI agent 通过 `event` 直接管理你的 Apple 提醒事项和日历。
+
+1. 确保已安装 `event` CLI，并且它已在系统 PATH 中（例如 `/usr/local/bin/event`）。
+2. 从 skills 仓库安装 `apple-events` skill：
+   ```bash
+   npx skills add https://github.com/FradSer/skills --skill apple-events
+   ```
+
+## 使用方法
 
 MIT License
 

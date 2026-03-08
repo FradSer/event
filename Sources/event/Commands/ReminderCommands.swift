@@ -10,9 +10,6 @@ struct ReminderCommands: AsyncParsableCommand {
         subcommands: [List.self, Create.self, Update.self, Delete.self, ListCommands.self]
     )
 
-    @Flag(name: .shortAndLong, help: "Disable Shortcut integration")
-    var noShortcuts: Bool = false
-
     struct List: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "List reminders"
@@ -71,6 +68,9 @@ struct ReminderCommands: AsyncParsableCommand {
         @Flag(help: "Mark as flagged")
         var flagged = false
 
+        @Flag(name: .long, help: "Disable Shortcut integration")
+        var noShortcuts = false
+
         @Flag(help: "Output in JSON format")
         var json = false
 
@@ -87,7 +87,7 @@ struct ReminderCommands: AsyncParsableCommand {
                 tags: tags,
                 parentTitle: parentTitle,
                 flagged: flagged ? true : nil,
-                useShortcuts: true
+                useShortcuts: !noShortcuts
             )
 
             let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
@@ -130,6 +130,9 @@ struct ReminderCommands: AsyncParsableCommand {
         @Flag(help: "Mark as flagged")
         var flagged = false
 
+        @Flag(name: .long, help: "Disable Shortcut integration")
+        var noShortcuts = false
+
         @Flag(help: "Output in JSON format")
         var json = false
 
@@ -147,7 +150,7 @@ struct ReminderCommands: AsyncParsableCommand {
                 url: url,
                 parentTitle: parentTitle,
                 flagged: flagged ? true : nil,
-                useShortcuts: true
+                useShortcuts: !noShortcuts
             )
 
             let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()

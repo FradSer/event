@@ -57,7 +57,10 @@ struct MarkdownFormatter: OutputFormatter {
                 }
 
                 if let notes = reminder.notes, !notes.isEmpty {
-                    output += "  - Notes: \(notes)\n"
+                    let indentedNotes = notes.split(separator: "\n", omittingEmptySubsequences: false)
+                        .map { "    \($0)" }
+                        .joined(separator: "\n")
+                    output += "  - Notes:\n\(indentedNotes)\n"
                 }
 
                 output += "  - ID: `\(reminder.id)`\n"
@@ -96,7 +99,10 @@ struct MarkdownFormatter: OutputFormatter {
         }
 
         if let notes = reminder.notes, !notes.isEmpty {
-            output += "**Notes:**\n\(notes)\n\n"
+            let indentedNotes = notes.split(separator: "\n", omittingEmptySubsequences: false)
+                .map { "  \($0)" }
+                .joined(separator: "\n")
+            output += "**Notes:**\n\(indentedNotes)\n\n"
         }
 
         output += "**ID:** `\(reminder.id)`\n"
@@ -128,7 +134,10 @@ struct MarkdownFormatter: OutputFormatter {
             }
 
             if let notes = event.notes, !notes.isEmpty {
-                output += "- Notes: \(notes)\n"
+                let indentedNotes = notes.split(separator: "\n", omittingEmptySubsequences: false)
+                    .map { "  \($0)" }
+                    .joined(separator: "\n")
+                output += "- Notes:\n\(indentedNotes)\n"
             }
 
             output += "- ID: `\(event.id)`\n\n"
@@ -153,7 +162,10 @@ struct MarkdownFormatter: OutputFormatter {
         }
 
         if let notes = event.notes, !notes.isEmpty {
-            output += "**Notes:**\n\(notes)\n\n"
+            let indentedNotes = notes.split(separator: "\n", omittingEmptySubsequences: false)
+                .map { "  \($0)" }
+                .joined(separator: "\n")
+            output += "**Notes:**\n\(indentedNotes)\n\n"
         }
 
         if let attendees = event.attendees, !attendees.isEmpty {

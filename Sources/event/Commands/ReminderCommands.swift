@@ -65,8 +65,8 @@ struct ReminderCommands: AsyncParsableCommand {
         @Option(help: "Parent reminder title (for creating subtasks via Shortcut)")
         var parentTitle: String?
 
-        @Flag(help: "Mark as flagged")
-        var flagged = false
+        @Option(help: "Mark as flagged (true/false)")
+        var flagged: Bool?
 
         @Flag(name: .long, help: "Disable Shortcut integration")
         var noShortcuts = false
@@ -86,7 +86,7 @@ struct ReminderCommands: AsyncParsableCommand {
                 priority: priority,
                 tags: tags,
                 parentTitle: parentTitle,
-                flagged: flagged ? true : nil,
+                flagged: flagged,
                 useShortcuts: !noShortcuts
             )
 
@@ -127,8 +127,8 @@ struct ReminderCommands: AsyncParsableCommand {
         @Option(help: "Parent reminder title (for converting to subtask)")
         var parentTitle: String?
 
-        @Flag(help: "Mark as flagged")
-        var flagged = false
+        @Option(help: "Mark as flagged (true/false)")
+        var flagged: Bool?
 
         @Flag(name: .long, help: "Disable Shortcut integration")
         var noShortcuts = false
@@ -149,7 +149,7 @@ struct ReminderCommands: AsyncParsableCommand {
                 tags: tags,
                 url: url,
                 parentTitle: parentTitle,
-                flagged: flagged ? true : nil,
+                flagged: flagged,
                 useShortcuts: !noShortcuts
             )
 

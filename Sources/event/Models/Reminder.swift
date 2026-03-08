@@ -31,7 +31,9 @@ struct Reminder: Codable {
         list = ekReminder.calendar?.title ?? "Unknown"
         notes = ekReminder.notes
 
-        // Flagged status now set via Shortcut, not stored in notes field
+        // We can't fetch isFlagged property directly from EKReminder using public API
+        // It relies on Shortcuts implementation to set it.
+        // It is currently impossible to read it reliably purely via EventKit without private APIs
         isFlagged = false
         url = ekReminder.url?.absoluteString
         location = ekReminder.location

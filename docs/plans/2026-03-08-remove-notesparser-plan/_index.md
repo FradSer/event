@@ -1,36 +1,42 @@
-# Plan: Remove NotesParser
+# Remove NotesParser Implementation Plan
 
 ## Overview
 
-Remove NotesParser from the codebase and migrate tag/flag/url handling to Shortcut-based approach.
+Execute the removal of NotesParser and implement Shortcut-based tag/flag/url handling.
 
-## Goals
+## Status
 
-1. Delete NotesParser.swift entirely
-2. Delete SubtaskService.swift and related commands
-3. Add global `--no-shortcuts` flag
-4. Update ReminderService to use Shortcut for advanced fields (tags, flagged, url, parentTitle)
-5. Graceful fallback when Shortcut is unavailable
+- **Phase**: Ready for Execution
+- **Design**: [Remove NotesParser Design](../2026-03-08-remove-notesparser-design/)
 
-## Architecture Changes
+## Background
 
-- **EventKit fields**: title, notes, dueDate, priority, completed (direct)
-- **Shortcut fields**: tags, flagged, url, parentTitle (via AdvancedReminderEdit)
-- **Fallback**: When Shortcut unavailable or --no-shortcuts used, advanced fields are silently skipped
+Based on code review of current state:
 
-## Dependencies
-
-All tasks are independent and can be executed in any order, but recommended order follows the dependency chain naturally.
+| Story | Status |
+|-------|--------|
+| Story 1: Remove NotesParser Dependency | 🔲 Verify |
+| Story 2: Shortcut-Based Tag/Flag/URL Operations | 🔲 Verify |
+| Story 3: Global --no-shortcuts Flag | 🔲 Fix |
+| Story 4: Remove Subtask Commands | 🔲 Verify |
 
 ## Execution Plan
 
-- [Task 001: Delete NotesParser.swift](./task-001-delete-notesparser.md)
-- [Task 002: Delete SubtaskService.swift](./task-002-delete-subtask-service.md)
-- [Task 003: Delete SubtaskCommands](./task-003-delete-subtask-commands.md)
-- [Task 004: Add Global --no-shortcuts Flag](./task-004-add-global-no-shortcuts-flag.md)
-- [Task 005: Update ReminderService Shortcut Flow](./task-005-update-reminder-service-shortcut-flow.md)
-- [Task 006: Delete Related Test Files](./task-006-delete-related-tests.md)
-- [Task 007: Update Reminder Model and Delete Subtask Model](./task-007-update-reminder-model.md)
-- [Task 008: Update MarkdownFormatter - Remove Subtask Formatting](./task-008-update-markdown-formatter.md)
-- [Task 009: Update MarkdownFormatter - Remove NotesParser Tags Parsing](./task-009-update-markdown-formatter-notes-parsing.md)
-- [Task 010: Delete SubtaskTests.swift](./task-010-delete-subtask-tests.md)
+### Verification Tasks
+- [Task 001: Verify NotesParser Removed](./task-001-verify-notesparser-removed.md)
+- [Task 002: Verify Subtasks Commands Removed](./task-002-verify-subtasks-removed.md)
+- [Task 003: Verify Shortcut Integration](./task-003-verify-shortcut-integration.md)
+- [Task 004: Verify --no-shortcuts Flag](./task-004-verify-no-shortcuts-flag.md)
+
+### Implementation Tasks
+- [Task 005: Fix Flag Propagation](./task-005-fix-flag-propagation.md)
+
+### Final Verification
+- [Task 006: Verify --parentTitle Works](./task-006-verify-parent-title.md)
+
+## Verification
+
+Run the CLI to test:
+```bash
+swift build
+```

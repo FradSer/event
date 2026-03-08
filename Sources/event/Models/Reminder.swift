@@ -7,6 +7,7 @@ struct Reminder: Codable {
     let id: String
     let title: String
     let isCompleted: Bool
+    let isFlagged: Bool
     let list: String
     let notes: String?
     let url: String?
@@ -29,6 +30,9 @@ struct Reminder: Codable {
         isCompleted = ekReminder.isCompleted
         list = ekReminder.calendar?.title ?? "Unknown"
         notes = ekReminder.notes
+
+        // Flagged status now set via Shortcut, not stored in notes field
+        isFlagged = false
         url = ekReminder.url?.absoluteString
         location = ekReminder.location
         timeZone = ekReminder.timeZone?.identifier

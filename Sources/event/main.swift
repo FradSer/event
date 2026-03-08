@@ -12,4 +12,7 @@ struct EventCLI: AsyncParsableCommand {
             CalendarCommands.self,
         ]
     )
+
+    @Flag(name: .shortAndLong, help: "Disable Shortcut integration")
+    var noShortcuts: Bool = false
 }

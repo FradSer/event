@@ -23,7 +23,7 @@ struct CalendarEvent: Codable {
     let attendees: [Participant]?
 
     init(from ekEvent: EKEvent, preferredTimeZone: TimeZone = .current) {
-        id = ekEvent.eventIdentifier
+        id = ekEvent.eventIdentifier ?? UUID().uuidString
         title = ekEvent.title ?? ""
         calendar = ekEvent.calendar?.title ?? "Unknown"
         isAllDay = ekEvent.isAllDay
@@ -32,17 +32,36 @@ struct CalendarEvent: Codable {
         url = ekEvent.url?.absoluteString
         timeZone = ekEvent.timeZone?.identifier
 
-        // Format dates
-        let formatter = DateFormatter()
         if ekEvent.isAllDay {
+            // For all-day events, the API often returns start of the day and start of the next day.
+            // When formatting all-day events, we should use the appropriate timezone to display the correct date.
+            let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
-        } else {
-            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        }
-        formatter.timeZone = preferredTimeZone
+            formatter.timeZone = preferredTimeZone
 
-        startDate = formatter.string(from: ekEvent.startDate)
-        endDate = formatter.string(from: ekEvent.endDate)
+            // Provide fallback dates if nil to avoid fatal errors in tests
+            let start = ekEvent.startDate ?? Date()
+            let end = ekEvent.endDate ?? start
+
+            startDate = formatter.string(from: start)
+
+            // For all-day events, the end date is exclusive (the day after the event ends).
+            // We'll subtract one second to get the actual last day of the event, but we'll
+            // format it as just the date anyway.
+            // Be careful to not subtract time from the exact same date to not flip it to the previous day if start == end
+            let adjustedEndDate = (end > start) ? end.addingTimeInterval(-1) : end
+            endDate = formatter.string(from: adjustedEndDate)
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            formatter.timeZone = preferredTimeZone
+
+            let start = ekEvent.startDate ?? Date()
+            let end = ekEvent.endDate ?? start
+
+            startDate = formatter.string(from: start)
+            endDate = formatter.string(from: end)
+        }
 
         // Format creation and modification dates (always with time)
         let timestampFormatter = DateFormatter()

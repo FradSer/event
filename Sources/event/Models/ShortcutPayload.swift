@@ -19,6 +19,7 @@ struct AdvancedReminderEditPayload: Encodable {
     let tags: String?            // Comma-separated tags (e.g., "work,urgent")
     let url: String?             // URL to set
     let parentTitle: String?     // Parent reminder title for creating subtask relationship
+    let isFlagged: String?       // "Yes" or "No" for flagged status
 
     enum CodingKeys: String, CodingKey {
         case title
@@ -26,5 +27,6 @@ struct AdvancedReminderEditPayload: Encodable {
         case tags
         case url
         case parentTitle
+        case isFlagged
     }
 }

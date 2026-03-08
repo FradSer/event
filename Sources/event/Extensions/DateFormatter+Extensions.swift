@@ -42,8 +42,24 @@ extension Date {
 
     /// Check if string is in all-day format (yyyy-MM-dd)
     static func isAllDayFormat(_ string: String) -> Bool {
-        // All-day format is exactly 10 characters: yyyy-MM-dd
-        return string.count == 10 && string.contains("-") && !string.contains(":")
+        let trimmed = string.trimmingCharacters(in: .whitespaces)
+
+        // Must be exactly 10 characters and not contain time separator
+        guard trimmed.count == 10 && !trimmed.contains(":") else {
+            return false
+        }
+
+        // Try to parse with strict format validation
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+
+        guard let date = formatter.date(from: trimmed) else {
+            return false
+        }
+
+        // Verify it formats back to the same string (no auto-correction)
+        return formatter.string(from: date) == trimmed
     }
 
     /// Parse date from string in format "yyyy-MM-dd HH:mm:ss"

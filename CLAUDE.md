@@ -14,6 +14,7 @@ swift build -c release
 # Run the CLI without installation
 .build/debug/event --help
 .build/debug/event reminders list
+.build/debug/event reminders list --json   # all commands support --json flag
 .build/debug/event calendar list
 
 # Install to system
@@ -54,9 +55,15 @@ tags: #tag1 #tag2 #tag3
 [x] Completed subtask {uuid}
 ```
 
-Everything before `---` is user notes; `tags:` line holds space-separated hashtags; `[ ]`/`[x]` lines are subtasks with title before ID. The metadata block is omitted entirely when empty. Tag pattern `#([\p{L}\p{N}_-]+)` supports Unicode (CJK characters).
+Everything before `---` is user notes; `tags:` line holds space-separated hashtags; `[ ]`/`[x]` lines are subtasks with title before ID. The metadata block is omitted entirely when empty. Tag pattern `#([\p{L}\p{N}_-]+)` supports Unicode (CJK characters). Subtask IDs are 8-char hex strings (4 random bytes via `SecRandomCopyBytes`).
+
+**Shortcuts CLI Dependency**: Creating subtasks via `--parentTitle` routes through the macOS Shortcuts app (`/usr/bin/shortcuts run <name>`). `ShortcutsService` checks if the named shortcut is installed before attempting to run it. This is the only path that requires an external Shortcut to be configured; direct subtask CRUD via `reminders subtasks` uses `NotesParser` only.
 
 **Output Formatting Strategy**: Commands return domain models (Reminder, CalendarEvent, etc.) which are then formatted by `OutputFormatter` implementations. This separation allows easy addition of new output formats without modifying business logic.
+
+### Priority Values
+
+EventKit uses `EKReminderPriority` which maps to integers: `1` = High, `5` = Medium, `9` = Low. Any other non-zero value is displayed as "Priority N". Zero means no priority.
 
 ### Date Handling
 

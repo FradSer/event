@@ -17,8 +17,6 @@ struct MarkdownFormatter: OutputFormatter {
             return formatReminderLists(lists)
         } else if let list = data as? ReminderList {
             return formatReminderList(list)
-        } else if let subtasks = data as? [Subtask] {
-            return formatSubtasks(subtasks)
         } else {
             // Fallback to JSON for unknown types
             return JSONFormatter().format(data)
@@ -42,7 +40,8 @@ struct MarkdownFormatter: OutputFormatter {
 
             for reminder in listReminders {
                 let checkbox = reminder.isCompleted ? "[x]" : "[ ]"
-                output += "- \(checkbox) \(reminder.title)\n"
+                let flagged = reminder.isFlagged ? " [flagged]" : ""
+                output += "- \(checkbox) \(reminder.title)\(flagged)\n"
 
                 if let dueDate = reminder.dueDate {
                     output += "  - Due: \(dueDate)\n"
@@ -53,18 +52,12 @@ struct MarkdownFormatter: OutputFormatter {
                     output += "  - Priority: \(priorityLabel)\n"
                 }
 
+                if let url = reminder.url {
+                    output += "  - URL: \(url)\n"
+                }
+
                 if let notes = reminder.notes, !notes.isEmpty {
-                    let parsed = NotesParser.parse(notes)
-                    if !parsed.userNotes.isEmpty {
-                        output += "  - Notes: \(parsed.userNotes)\n"
-                    }
-                    if !parsed.tags.isEmpty {
-                        output += "  - Tags: \(parsed.tags.map { "#\($0)" }.joined(separator: ", "))\n"
-                    }
-                    if !parsed.subtasks.isEmpty {
-                        output +=
-                            "  - Subtasks: \(parsed.subtasks.count) (\(parsed.subtasks.filter { $0.isCompleted }.count) completed)\n"
-                    }
+                    output += "  - Notes: \(notes)\n"
                 }
 
                 output += "  - ID: `\(reminder.id)`\n"
@@ -80,7 +73,12 @@ struct MarkdownFormatter: OutputFormatter {
         var output = "### Reminder: \(reminder.title)\n\n"
 
         let checkbox = reminder.isCompleted ? "[x]" : "[ ]"
-        output += "**Status:** \(checkbox) \(reminder.isCompleted ? "Completed" : "Incomplete")\n\n"
+        output += "**Status:** \(checkbox) \(reminder.isCompleted ? "Completed" : "Incomplete")"
+
+        if reminder.isFlagged {
+            output += " [flagged]"
+        }
+        output += "\n\n"
 
         output += "**List:** \(reminder.list)\n\n"
 
@@ -93,22 +91,12 @@ struct MarkdownFormatter: OutputFormatter {
             output += "**Priority:** \(priorityLabel)\n\n"
         }
 
+        if let url = reminder.url {
+            output += "**URL:** \(url)\n\n"
+        }
+
         if let notes = reminder.notes, !notes.isEmpty {
-            let parsed = NotesParser.parse(notes)
-            if !parsed.userNotes.isEmpty {
-                output += "**Notes:**\n\(parsed.userNotes)\n\n"
-            }
-            if !parsed.tags.isEmpty {
-                output += "**Tags:** \(parsed.tags.map { "#\($0)" }.joined(separator: ", "))\n\n"
-            }
-            if !parsed.subtasks.isEmpty {
-                output += "**Subtasks:**\n"
-                for subtask in parsed.subtasks {
-                    let checkbox = subtask.isCompleted ? "[x]" : "[ ]"
-                    output += "- \(checkbox) \(subtask.title)\n"
-                }
-                output += "\n"
-            }
+            output += "**Notes:**\n\(notes)\n\n"
         }
 
         output += "**ID:** `\(reminder.id)`\n"
@@ -210,24 +198,6 @@ struct MarkdownFormatter: OutputFormatter {
 
         if list.isImmutable {
             output += "**Type:** System List (Immutable)\n"
-        }
-
-        return output
-    }
-
-    // MARK: - Subtask Formatting
-
-    private func formatSubtasks(_ subtasks: [Subtask]) -> String {
-        guard !subtasks.isEmpty else {
-            return "No subtasks found."
-        }
-
-        var output = "### Subtasks\n\n"
-
-        for subtask in subtasks {
-            let checkbox = subtask.isCompleted ? "[x]" : "[ ]"
-            output += "- \(checkbox) \(subtask.title)\n"
-            output += "  - ID: `\(subtask.id)`\n"
         }
 
         return output

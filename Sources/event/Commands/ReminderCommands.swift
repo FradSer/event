@@ -7,8 +7,11 @@ struct ReminderCommands: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "reminders",
         abstract: "Manage Apple Reminders (tasks, lists, subtasks)",
-        subcommands: [List.self, Create.self, Update.self, Delete.self, ListCommands.self, SubtaskCommands.self]
+        subcommands: [List.self, Create.self, Update.self, Delete.self, ListCommands.self]
     )
+
+    @Flag(name: .shortAndLong, help: "Disable Shortcut integration")
+    var noShortcuts: Bool = false
 
     struct List: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
@@ -65,6 +68,9 @@ struct ReminderCommands: AsyncParsableCommand {
         @Option(help: "Parent reminder title (for creating subtasks via Shortcut)")
         var parentTitle: String?
 
+        @Flag(help: "Mark as flagged")
+        var flagged = false
+
         @Flag(help: "Output in JSON format")
         var json = false
 
@@ -79,7 +85,9 @@ struct ReminderCommands: AsyncParsableCommand {
                 dueDate: due,
                 priority: priority,
                 tags: tags,
-                parentTitle: parentTitle
+                parentTitle: parentTitle,
+                flagged: flagged ? true : nil,
+                useShortcuts: true
             )
 
             let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
@@ -119,6 +127,9 @@ struct ReminderCommands: AsyncParsableCommand {
         @Option(help: "Parent reminder title (for converting to subtask)")
         var parentTitle: String?
 
+        @Flag(help: "Mark as flagged")
+        var flagged = false
+
         @Flag(help: "Output in JSON format")
         var json = false
 
@@ -134,7 +145,9 @@ struct ReminderCommands: AsyncParsableCommand {
                 priority: priority,
                 tags: tags,
                 url: url,
-                parentTitle: parentTitle
+                parentTitle: parentTitle,
+                flagged: flagged ? true : nil,
+                useShortcuts: true
             )
 
             let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()

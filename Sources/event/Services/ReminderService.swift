@@ -54,7 +54,9 @@ actor ReminderService {
         dueDate: String? = nil,
         priority: Int? = nil,
         tags: String? = nil,
-        parentTitle: String? = nil
+        parentTitle: String? = nil,
+        flagged: Bool? = nil,
+        useShortcuts: Bool = true
     ) async throws -> Reminder {
         try await permissionService.ensureRemindersAccess()
 
@@ -63,17 +65,19 @@ actor ReminderService {
             title: title,
             listName: listName,
             notes: notes,
+            url: url,
             dueDate: dueDate,
             priority: priority
         )
 
-        // Step 2: Post-process with advanced features if needed
-        if needsAdvancedProcessing(tags: tags, url: url, parentTitle: parentTitle) {
+        // Step 2: Post-process with advanced features if needed (tags, flagged, parentTitle)
+        if needsAdvancedProcessing(tags: tags, parentTitle: parentTitle, flagged: flagged) {
             try await postProcessReminder(
                 id: reminderId,
                 tags: tags,
-                url: url,
-                parentTitle: parentTitle
+                parentTitle: parentTitle,
+                flagged: flagged,
+                useShortcuts: useShortcuts
             )
         }
 
@@ -91,7 +95,9 @@ actor ReminderService {
         priority: Int? = nil,
         tags: String? = nil,
         url: String? = nil,
-        parentTitle: String? = nil
+        parentTitle: String? = nil,
+        flagged: Bool? = nil,
+        useShortcuts: Bool = true
     ) async throws -> Reminder {
         try await permissionService.ensureRemindersAccess()
 
@@ -102,16 +108,18 @@ actor ReminderService {
             completed: completed,
             notes: notes,
             dueDate: dueDate,
-            priority: priority
+            priority: priority,
+            url: url
         )
 
         // Step 2: Post-process with advanced features if needed
-        if needsAdvancedProcessing(tags: tags, url: url, parentTitle: parentTitle) {
+        if needsAdvancedProcessing(tags: tags, parentTitle: parentTitle, flagged: flagged) {
             try await postProcessReminder(
                 id: id,
                 tags: tags,
-                url: url,
-                parentTitle: parentTitle
+                parentTitle: parentTitle,
+                flagged: flagged,
+                useShortcuts: useShortcuts
             )
         }
 
@@ -133,8 +141,8 @@ actor ReminderService {
     // MARK: - Helper Functions
 
     /// Check if advanced processing is needed
-    private func needsAdvancedProcessing(tags: String?, url: String?, parentTitle: String?) -> Bool {
-        return tags != nil || url != nil || parentTitle != nil
+    private func needsAdvancedProcessing(tags: String?, parentTitle: String?, flagged: Bool?) -> Bool {
+        return tags != nil || parentTitle != nil || flagged != nil
     }
 
     /// Fetch a reminder by ID
@@ -145,12 +153,13 @@ actor ReminderService {
         return Reminder(from: ekReminder)
     }
 
-    /// Post-process reminder with advanced features
+    /// Post-process reminder with advanced features via Shortcut
     private func postProcessReminder(
         id: String,
         tags: String?,
-        url: String?,
-        parentTitle: String?
+        parentTitle: String?,
+        flagged: Bool?,
+        useShortcuts: Bool
     ) async throws {
         // Get reminder details for shortcut
         guard let ekReminder = eventStore.calendarItem(withIdentifier: id) as? EKReminder else {
@@ -160,87 +169,53 @@ actor ReminderService {
         let title = ekReminder.title ?? ""
         let listName = ekReminder.calendar?.title ?? "Reminders"
 
+        // If shortcuts are disabled, skip entirely
+        if !useShortcuts {
+            if tags != nil || parentTitle != nil || flagged != nil {
+                print("Note: Advanced fields (tags, flagged, parentTitle) require Shortcut integration.")
+                print("Use without --no-shortcuts to enable.")
+            }
+            return
+        }
+
         let shortcutsService = ShortcutsService()
         let shortcutName = "AdvancedReminderEdit"
-        let isShortcutInstalled = try await shortcutsService.isShortcutInstalled(name: shortcutName)
+
+        // Check if shortcut is installed
+        let isShortcutInstalled: Bool
+        do {
+            isShortcutInstalled = try await shortcutsService.isShortcutInstalled(name: shortcutName)
+        } catch {
+            print("Note: Could not check for shortcut. Advanced features disabled.")
+            return
+        }
+
+        // Convert flagged to "Yes"/"No" string for shortcut
+        let flaggedString: String? = flagged == true ? "Yes" : (flagged == false ? "No" : nil)
 
         if isShortcutInstalled {
             let payload = AdvancedReminderEditPayload(
                 title: title,
                 list: listName,
                 tags: tags,
-                url: url,
-                parentTitle: parentTitle
+                url: nil,
+                parentTitle: parentTitle,
+                isFlagged: flaggedString
             )
 
             do {
                 _ = try await shortcutsService.runShortcut(name: shortcutName, input: payload)
-                print("Shortcut executed successfully")
                 return
             } catch {
-                print("Warning: Shortcut execution failed (\(error.localizedDescription)). Falling back to EventKit.")
+                print("Note: Shortcut execution failed. Advanced features not set.")
+                return
             }
-        } else {
-            print("Note: AdvancedReminderEdit shortcut not found.")
-            print("Install it at: https://www.icloud.com/shortcuts/b578334075754da9ba6e50b501515808")
         }
 
-        // Fallback processing
-        try await fallbackProcessing(id: id, tags: tags, url: url, parentTitle: parentTitle)
-    }
-
-    /// Fallback processing when shortcut is not available
-    private func fallbackProcessing(
-        id: String,
-        tags: String?,
-        url: String?,
-        parentTitle: String?
-    ) async throws {
-        if let tags = tags {
-            try updateTagsViaNotesField(id: id, tags: tags)
-            print("Note: Tags updated via notes field workaround.")
-            print("For native tags, install the AdvancedReminderEdit shortcut:")
-            print("https://www.icloud.com/shortcuts/b578334075754da9ba6e50b501515808")
-        }
-
-        if let url = url {
-            try updateURLViaEventKit(id: id, url: url)
-        }
-
-        if parentTitle != nil {
-            print("Warning: Creating subtask relationships requires the AdvancedReminderEdit shortcut.")
-            print("Install it at: https://www.icloud.com/shortcuts/b578334075754da9ba6e50b501515808")
-            print("The reminder was created as a standalone item.")
-        }
-    }
-
-    /// Update tags via notes field workaround
-    private func updateTagsViaNotesField(id: String, tags: String) throws {
-        guard let ekReminder = eventStore.calendarItem(withIdentifier: id) as? EKReminder else {
-            throw EventCLIError.notFound("Reminder with ID '\(id)' not found")
-        }
-
-        // Split tags string into array
-        let tagArray = tags.components(separatedBy: ",").map {
-            $0.trimmingCharacters(in: .whitespaces)
-        }
-
-        var parsed = NotesParser.parse(ekReminder.notes)
-        parsed.tags = tagArray
-        ekReminder.notes = NotesParser.serialize(parsed)
-        try eventStore.save(ekReminder, commit: true)
-    }
-
-    /// Update URL via EventKit
-    private func updateURLViaEventKit(id: String, url: String) throws {
-        guard let ekReminder = eventStore.calendarItem(withIdentifier: id) as? EKReminder else {
-            throw EventCLIError.notFound("Reminder with ID '\(id)' not found")
-        }
-
-        if let validURL = URL(string: url) {
-            ekReminder.url = validURL
-            try eventStore.save(ekReminder, commit: true)
-        }
+        // Shortcut not available - show info message
+        print("Note: AdvancedReminderEdit shortcut not found.")
+        print("Install it at: https://www.icloud.com/shortcuts/b578334075754da9ba6e50b501515808")
+        print("Without it, only basic reminder fields (title, notes, dueDate, priority) can be set.")
     }
 
     /// Create reminder via EventKit (basic properties only)
@@ -248,6 +223,7 @@ actor ReminderService {
         title: String,
         listName: String?,
         notes: String?,
+        url: String?,
         dueDate: String?,
         priority: Int?
     ) throws -> String {
@@ -265,9 +241,14 @@ actor ReminderService {
             ekReminder.calendar = eventStore.defaultCalendarForNewReminders()
         }
 
-        // Set notes (without tags - those will be added in post-processing)
+        // Set notes (basic notes, no tags/subtasks)
         if let notes = notes, !notes.isEmpty {
             ekReminder.notes = notes
+        }
+
+        // Set URL
+        if let url = url, let validURL = URL(string: url) {
+            ekReminder.url = validURL
         }
 
         // Set due date
@@ -293,7 +274,8 @@ actor ReminderService {
         completed: Bool?,
         notes: String?,
         dueDate: String?,
-        priority: Int?
+        priority: Int?,
+        url: String?
     ) throws {
         guard let ekReminder = eventStore.calendarItem(withIdentifier: id) as? EKReminder else {
             throw EventCLIError.notFound("Reminder with ID '\(id)' not found")
@@ -308,9 +290,11 @@ actor ReminderService {
         }
 
         if let notes = notes {
-            var parsed = NotesParser.parse(ekReminder.notes)
-            parsed.userNotes = notes
-            ekReminder.notes = NotesParser.serialize(parsed)
+            ekReminder.notes = notes
+        }
+
+        if let url = url, let validURL = URL(string: url) {
+            ekReminder.url = validURL
         }
 
         if let dueDateString = dueDate {

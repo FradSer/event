@@ -15,9 +15,9 @@ actor CalendarService {
     ) async throws -> [CalendarEvent] {
         try await permissionService.ensureCalendarAccess()
 
-        let start = startDate.flatMap { Date.from(dateString: $0) } ?? Date()
+        let start = try startDate.flatMap { try Date.validated(dateString: $0) } ?? Date()
         let end =
-            endDate.flatMap { Date.from(dateString: $0) }
+            try endDate.flatMap { try Date.validated(dateString: $0) }
                 ?? Calendar.current.date(byAdding: .month, value: 1, to: start)
                 ?? Date()
 

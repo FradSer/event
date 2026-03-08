@@ -70,13 +70,14 @@ actor ReminderService {
             priority: priority
         )
 
-        // Step 2: Post-process with advanced features if needed (tags, flagged, parentTitle)
-        if needsAdvancedProcessing(tags: tags, parentTitle: parentTitle, flagged: flagged) {
+        // Step 2: Post-process with advanced features if needed (tags, flagged, parentTitle, url)
+        if needsAdvancedProcessing(tags: tags, parentTitle: parentTitle, flagged: flagged, url: url) {
             try await postProcessReminder(
                 id: reminderId,
                 tags: tags,
                 parentTitle: parentTitle,
                 flagged: flagged,
+                url: url,
                 useShortcuts: useShortcuts
             )
         }
@@ -113,12 +114,13 @@ actor ReminderService {
         )
 
         // Step 2: Post-process with advanced features if needed
-        if needsAdvancedProcessing(tags: tags, parentTitle: parentTitle, flagged: flagged) {
+        if needsAdvancedProcessing(tags: tags, parentTitle: parentTitle, flagged: flagged, url: url) {
             try await postProcessReminder(
                 id: id,
                 tags: tags,
                 parentTitle: parentTitle,
                 flagged: flagged,
+                url: url,
                 useShortcuts: useShortcuts
             )
         }
@@ -141,8 +143,8 @@ actor ReminderService {
     // MARK: - Helper Functions
 
     /// Check if advanced processing is needed
-    private func needsAdvancedProcessing(tags: String?, parentTitle: String?, flagged: Bool?) -> Bool {
-        return tags != nil || parentTitle != nil || flagged != nil
+    private func needsAdvancedProcessing(tags: String?, parentTitle: String?, flagged: Bool?, url: String?) -> Bool {
+        return tags != nil || parentTitle != nil || flagged != nil || url != nil
     }
 
     /// Fetch a reminder by ID
@@ -159,6 +161,7 @@ actor ReminderService {
         tags: String?,
         parentTitle: String?,
         flagged: Bool?,
+        url: String?,
         useShortcuts: Bool
     ) async throws {
         // Get reminder details for shortcut
@@ -171,9 +174,14 @@ actor ReminderService {
 
         // If shortcuts are disabled, skip entirely
         if !useShortcuts {
-            if tags != nil || parentTitle != nil || flagged != nil {
-                print("Note: Advanced fields (tags, flagged, parentTitle) require Shortcut integration.")
+            if tags != nil || parentTitle != nil || flagged != nil || url != nil {
+                print("Note: Advanced fields (tags, flagged, parentTitle, url) require Shortcut integration.")
                 print("Use without --no-shortcuts to enable.")
+            }
+            // Fallback for URL if shortcuts are disabled
+            if let url = url, let validURL = URL(string: url) {
+                ekReminder.url = validURL
+                try eventStore.save(ekReminder, commit: true)
             }
             return
         }
@@ -187,6 +195,11 @@ actor ReminderService {
             isShortcutInstalled = try await shortcutsService.isShortcutInstalled(name: shortcutName)
         } catch {
             print("Note: Could not check for shortcut. Advanced features disabled.")
+            // Fallback for URL
+            if let url = url, let validURL = URL(string: url) {
+                ekReminder.url = validURL
+                try eventStore.save(ekReminder, commit: true)
+            }
             return
         }
 
@@ -198,7 +211,7 @@ actor ReminderService {
                 title: title,
                 list: listName,
                 tags: tags,
-                url: nil,
+                url: url,
                 parentTitle: parentTitle,
                 isFlagged: flaggedString
             )
@@ -208,6 +221,11 @@ actor ReminderService {
                 return
             } catch {
                 print("Note: Shortcut execution failed. Advanced features not set.")
+                // Fallback for URL
+                if let url = url, let validURL = URL(string: url) {
+                    ekReminder.url = validURL
+                    try eventStore.save(ekReminder, commit: true)
+                }
                 return
             }
         }
@@ -216,6 +234,11 @@ actor ReminderService {
         print("Note: AdvancedReminderEdit shortcut not found.")
         print("Install it at: https://www.icloud.com/shortcuts/b578334075754da9ba6e50b501515808")
         print("Without it, only basic reminder fields (title, notes, dueDate, priority) can be set.")
+        // Fallback for URL
+        if let url = url, let validURL = URL(string: url) {
+            ekReminder.url = validURL
+            try eventStore.save(ekReminder, commit: true)
+        }
     }
 
     /// Create reminder via EventKit (basic properties only)
@@ -246,10 +269,9 @@ actor ReminderService {
             ekReminder.notes = notes
         }
 
-        // Set URL
-        if let url = url, let validURL = URL(string: url) {
-            ekReminder.url = validURL
-        }
+        // We no longer set URL here since it's handled by Shortcuts for better compatibility
+        // The fallback is handled in postProcessReminder if shortcuts are disabled
+        // Let EventKit create the item first, URL will be added later
 
         // Set due date
         if let dueDateString = dueDate {
@@ -293,9 +315,9 @@ actor ReminderService {
             ekReminder.notes = notes
         }
 
-        if let url = url, let validURL = URL(string: url) {
-            ekReminder.url = validURL
-        }
+        // We no longer set URL here since it's handled by Shortcuts for better compatibility
+        // The fallback is handled in postProcessReminder if shortcuts are disabled
+        // Let EventKit create the item first, URL will be added later
 
         if let dueDateString = dueDate {
             let date = try Date.validated(dateTimeString: dueDateString)

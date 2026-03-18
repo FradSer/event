@@ -330,22 +330,45 @@ Feature: Linux 端通过 Cloudflare D1 管理日历事件
 ## Feature: 初始化配置（F-6）
 
 ```gherkin
-Feature: 通过 event sync init 配置同步
+Feature: 通过 event sync init 一键完成所有基建搭建
   作为新用户
-  我希望通过一条命令完成同步配置
-  以便快速开始使用跨平台同步
+  我希望只需登录一次 Cloudflare，然后运行一条命令
+  以便自动完成所有配置，无需手动操作 Cloudflare 控制台
 
-  Scenario: 首次配置同步（F-6-1）
+  Background:
+    Given 用户已安装 wrangler CLI
+    And 用户已运行 wrangler login（完成 OAuth 授权）
+
+  Scenario: 首次初始化（F-6-1）
     Given 用户首次运行 event sync init
-    When 用户提供 --url https://event-sync.workers.dev --token abc123
-    Then 配置保存到 ~/.config/event/config.toml
-    And 生成新的 AES-256 加密主密钥
-    And macOS 上密钥保存到 Keychain
-    And Linux 上输出 BASE64_KEY 供用户设置环境变量
-    And 输出成功配置提示
+    Then CLI 通过 Cloudflare API 自动创建 D1 数据库 "event-sync-db"
+    And CLI 自动初始化数据库 Schema
+    And CLI 将 Worker 代码上传并部署到 Cloudflare
+    And CLI 随机生成 Bearer Token 并写入 Worker secret（用户不可见）
+    And CLI 生成 AES-256 加密主密钥并存入 macOS Keychain
+    And Worker URL 保存到 ~/.config/event/config.toml
+    And 输出包含 Linux Agent 所需的三个环境变量：
+      - CLOUDFLARE_API_URL
+      - CLOUDFLARE_API_TOKEN
+      - EVENT_ENCRYPTION_KEY
 
-  Scenario: 查看同步状态（F-6-2）
-    Given 用户已配置同步
+  Scenario: 初始化时 wrangler 未登录（F-6-2）
+    Given 用户未运行 wrangler login
+    When 用户运行 event sync init
+    Then CLI 报告错误"请先运行 wrangler login"
+    And 不执行任何 Cloudflare 操作
+
+  Scenario: 重复初始化复用已有数据库（F-6-3）
+    Given 用户已完成过 event sync init
+    And D1 数据库 "event-sync-db" 已存在
+    When 用户再次运行 event sync init
+    Then CLI 复用已有的 D1 数据库（不重新创建）
+    And CLI 重新部署 Worker（更新代码）
+    And CLI 复用 Keychain 中的加密密钥（不重新生成）
+    And 重新输出 Linux Agent 环境变量
+
+  Scenario: 查看同步状态（F-6-4）
+    Given 用户已完成 event sync init
     When 用户运行 event sync status
     Then 输出包含：
       - Cloudflare Workers URL

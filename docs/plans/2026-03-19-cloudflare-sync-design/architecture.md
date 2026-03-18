@@ -334,13 +334,21 @@ struct SyncCommands: ParsableCommand {
         subcommands: [Init.self, Status.self, Push.self, Pull.self, Daemon.self]
     )
 
-    struct Init: ParsableCommand {
-        @Option(help: "Cloudflare Workers URL") var url: String
-        @Option(help: "API Token") var token: String
-        @Flag(help: "生成新的加密密钥") var generateKey: Bool = false
+    // 前置条件：用户已运行 `wrangler login`
+    struct Init: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "自动完成所有 Cloudflare 基建搭建（需先运行 wrangler login）"
+        )
 
-        func run() throws {
-            // 保存配置，生成并存储加密密钥
+        // 可选：覆盖自动生成的数据库名称
+        @Option(help: "D1 数据库名称（默认：event-sync-db）")
+        var dbName: String = "event-sync-db"
+
+        func run() async throws {
+            let initService = SyncInitService()
+            try await initService.initialize(dbName: dbName)
+            // 自动完成：创建 D1、部署 Worker、生成 Token、
+            //           生成加密密钥存 Keychain、输出 Linux 环境变量
         }
     }
 

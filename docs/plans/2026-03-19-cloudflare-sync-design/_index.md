@@ -12,7 +12,7 @@
 2. **云端 Agent（Linux）**：同一 Swift CLI 编译后直接操作 Cloudflare D1
 3. **端到端加密**：敏感字段在客户端加密，Cloudflare 只存密文
 4. **双向同步**：两端完整读写，变更自动同步，冲突自动解决
-5. **用户配置**：通过 `event sync init` 配置 Cloudflare API 凭据
+5. **零配置体验**：用户只需 `wrangler login` 登录 Cloudflare，`event sync init` 自动完成所有基建搭建
 
 ---
 
@@ -28,9 +28,10 @@
 | R6 | `event sync` 子命令管理同步配置和状态 | Must |
 | R7 | Last-Write-Wins 冲突解决 | Must |
 | R8 | Cloudflare Workers 提供 REST CRUD API | Must |
-| R9 | Bearer Token 认证 | Must |
+| R9 | Bearer Token 认证（由 CLI 自动生成，用户无需手动设置） | Must |
 | R10 | 网络断开时本地操作不受影响（Mac 端） | Must |
 | R11 | 加密主密钥在 macOS 存于 Keychain，Linux 存于环境变量 | Must |
+| R12 | `event sync init` 自动完成所有 Cloudflare 基建搭建 | Must |
 
 ---
 
@@ -284,8 +285,18 @@ CREATE INDEX idx_events_version ON calendar_events(sync_version);
 ### 新增 CLI 命令
 
 ```bash
-# 初始化同步配置
-event sync init --url <workers-url> --token <api-token>
+# 前置：登录 Cloudflare（一次性，OAuth 浏览器授权）
+wrangler login
+
+# 初始化：自动完成所有基建搭建
+event sync init
+# 自动执行：
+#   1. 创建 D1 数据库（event-sync-db）
+#   2. 上传并部署 Worker 代码
+#   3. 生成随机 Bearer Token，写入 Worker secret
+#   4. 生成 AES-256 加密主密钥，存入 macOS Keychain
+#   5. 保存 Worker URL 到 ~/.config/event/config.toml
+#   6. 输出 Linux 环境变量配置（供 Agent 使用）
 
 # 查看同步状态
 event sync status

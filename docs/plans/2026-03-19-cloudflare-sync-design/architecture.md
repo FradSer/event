@@ -180,23 +180,30 @@ actor EncryptionService {
         self.key = key
     }
 
-    // 加密：返回 (ciphertext: Data, iv: Data)
-    func encrypt(_ payload: EncryptedPayload, recordId: String, modifiedDate: String) throws -> (ciphertext: Data, iv: Data) {
+    // 加密：返回 (encryptedPayload: String, encryptedIV: String)，均为 base64 编码
+    func encrypt(_ payload: EncryptedPayload, recordId: String, modifiedDate: String) throws -> (encryptedPayload: String, encryptedIV: String) {
         let plaintext = try JSONEncoder().encode(payload)
         let nonce = try AES.GCM.Nonce()  // 随机 12-byte IV
         let aad = "\(recordId)|\(modifiedDate)".data(using: .utf8)!
 
         let sealed = try AES.GCM.seal(plaintext, using: key, nonce: nonce, authenticating: aad)
-        return (sealed.ciphertext + sealed.tag, Data(nonce))
+        // D1 TEXT 字段存储 base64 字符串
+        let ciphertextWithTag = sealed.ciphertext + sealed.tag
+        return (ciphertextWithTag.base64EncodedString(), Data(nonce).base64EncodedString())
     }
 
-    // 解密
-    func decrypt(_ ciphertext: Data, iv: Data, recordId: String, modifiedDate: String) throws -> EncryptedPayload {
-        let nonce = try AES.GCM.Nonce(data: iv)
+    // 解密：接受 base64 字符串（从 D1 读取）
+    func decrypt(_ encryptedPayload: String, iv encryptedIV: String, recordId: String, modifiedDate: String) throws -> EncryptedPayload {
+        guard let ciphertext = Data(base64Encoded: encryptedPayload),
+              let ivData = Data(base64Encoded: encryptedIV) else {
+            throw EventCLIError.invalidInput("无效的 base64 加密数据")
+        }
+        let nonce = try AES.GCM.Nonce(data: ivData)
         let aad = "\(recordId)|\(modifiedDate)".data(using: .utf8)!
         let tag = ciphertext.suffix(16)
         let cipher = ciphertext.dropLast(16)
         let box = try AES.GCM.SealedBox(nonce: nonce, ciphertext: cipher, tag: tag)
+        let aad = "\(recordId)|\(modifiedDate)".data(using: .utf8)!
         let plaintext = try AES.GCM.open(box, using: key, authenticating: aad)
         return try JSONDecoder().decode(EncryptedPayload.self, from: plaintext)
     }

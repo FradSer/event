@@ -49,7 +49,7 @@
 ### 决策 3：部分字段加密（非全字段）
 
 **理由**：`title`, `list_name`, `is_completed`, `due_date` 等用于云端查询和过滤，必须保持明文。
-**加密字段**：`notes`, `url`, `location`, `alarms` 打包为 `encrypted_payload` JSON blob。
+**加密字段**：`notes`, `url`, `location`, `alarms`, `recurrenceRules`（任务）及 `attendees`（日历事件）打包为 `encrypted_payload` JSON blob，存储为 base64 编码字符串。
 
 ### 决策 4：Cloudflare Workers + Hono.js
 

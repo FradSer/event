@@ -161,6 +161,29 @@ let changes = try await client.get(
 )
 ```
 
+### 时间戳格式（重要）
+
+**推荐使用整数毫秒时间戳**存储 `last_modified_date` 和 `updated_at`，而非 ISO 8601 字符串：
+
+```swift
+// 推荐：整数毫秒时间戳（SQLite 比较更高效）
+let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+
+// 不推荐：字符串时间戳（SQLite TEXT 比较有边界坑）
+// let timestamp = "2026-03-19T10:00:00.000Z"
+```
+
+```sql
+-- D1 Schema 中的时间戳字段用 INTEGER
+last_modified_date INTEGER NOT NULL,  -- Unix ms timestamp
+updated_at INTEGER DEFAULT (unixepoch() * 1000)
+```
+
+好处：
+- SQLite 整数比较比 TEXT 快
+- 不受时区/格式化库差异影响
+- 自然支持 `WHERE updated_at > ?` 增量查询
+
 ### Workers 免费额度管理
 - 免费套餐：10 万次请求/天
 - 单用户日常使用 < 1000 次，完全在免费额度内

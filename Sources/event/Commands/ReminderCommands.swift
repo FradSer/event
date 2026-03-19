@@ -115,6 +115,15 @@ struct ReminderCommands: AsyncParsableCommand {
         @Option(name: .shortAndLong, help: "New due date (yyyy-MM-dd HH:mm:ss)")
         var due: String?
 
+        @Flag(name: .long, help: "Remove due date")
+        var clearDue = false
+
+        @Option(name: .long, help: "New start date (yyyy-MM-dd HH:mm:ss)")
+        var start: String?
+
+        @Flag(name: .long, help: "Remove start date")
+        var clearStart = false
+
         @Option(name: .shortAndLong, help: "New notes")
         var notes: String?
 
@@ -137,6 +146,13 @@ struct ReminderCommands: AsyncParsableCommand {
         var json = false
 
         func run() async throws {
+            if clearDue, due != nil {
+                throw EventCLIError.invalidInput("Use either --due or --clear-due, not both.")
+            }
+            if clearStart, start != nil {
+                throw EventCLIError.invalidInput("Use either --start or --clear-start, not both.")
+            }
+
             let service = ReminderService()
 
             let reminder = try await service.updateReminder(
@@ -145,6 +161,9 @@ struct ReminderCommands: AsyncParsableCommand {
                 completed: completed ? true : nil,
                 notes: notes,
                 dueDate: due,
+                clearDue: clearDue,
+                startDate: start,
+                clearStart: clearStart,
                 priority: priority,
                 tags: tags,
                 url: url,

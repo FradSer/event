@@ -93,6 +93,9 @@ actor ReminderService {
         completed: Bool? = nil,
         notes: String? = nil,
         dueDate: String? = nil,
+        clearDue: Bool = false,
+        startDate: String? = nil,
+        clearStart: Bool = false,
         priority: Int? = nil,
         tags: String? = nil,
         url: String? = nil,
@@ -109,6 +112,9 @@ actor ReminderService {
             completed: completed,
             notes: notes,
             dueDate: dueDate,
+            clearDue: clearDue,
+            startDate: startDate,
+            clearStart: clearStart,
             priority: priority,
             url: url
         )
@@ -296,6 +302,9 @@ actor ReminderService {
         completed: Bool?,
         notes: String?,
         dueDate: String?,
+        clearDue: Bool,
+        startDate: String?,
+        clearStart: Bool,
         priority: Int?,
         url: String?
     ) throws {
@@ -319,10 +328,20 @@ actor ReminderService {
         // The fallback is handled in postProcessReminder if shortcuts are disabled
         // Let EventKit create the item first, URL will be added later
 
-        if let dueDateString = dueDate {
+        if clearDue {
+            ekReminder.dueDateComponents = nil
+        } else if let dueDateString = dueDate {
             let date = try Date.validated(dateTimeString: dueDateString)
             let components = DateComponentsBuilder.build(from: date, timeZone: .current)
             ekReminder.dueDateComponents = components
+        }
+
+        if clearStart {
+            ekReminder.startDateComponents = nil
+        } else if let startDateString = startDate {
+            let date = try Date.validated(dateTimeString: startDateString)
+            let components = DateComponentsBuilder.build(from: date, timeZone: .current)
+            ekReminder.startDateComponents = components
         }
 
         if let priority = priority {

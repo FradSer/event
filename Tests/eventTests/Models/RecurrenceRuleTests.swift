@@ -1,4 +1,5 @@
 import XCTest
+import EventModels
 import EventKit
 @testable import event
 

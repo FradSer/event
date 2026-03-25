@@ -1,4 +1,5 @@
 import XCTest
+import EventModels
 import EventKit
 import CoreLocation
 @testable import event

@@ -1,4 +1,5 @@
 import EventKit
+import EventModels
 import Foundation
 
 // MARK: - List Service

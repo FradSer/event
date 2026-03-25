@@ -1,3 +1,4 @@
+import EventModels
 import Foundation
 
 // MARK: - Shortcuts Service

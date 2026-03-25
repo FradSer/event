@@ -1,0 +1,30 @@
+-- D1 schema for event-sync
+-- Run: wrangler d1 execute event-sync --file=src/schema.sql
+
+CREATE TABLE IF NOT EXISTS reminders (
+    id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    last_modified TEXT NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS calendar_events (
+    id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    last_modified TEXT NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS reminder_lists (
+    id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    last_modified TEXT NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminders_updated ON reminders (updated_at);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_updated ON calendar_events (updated_at);
+CREATE INDEX IF NOT EXISTS idx_reminder_lists_updated ON reminder_lists (updated_at);

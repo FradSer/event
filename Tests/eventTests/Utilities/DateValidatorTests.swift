@@ -1,4 +1,5 @@
 import XCTest
+import EventModels
 @testable import event
 
 final class DateValidatorTests: XCTestCase {

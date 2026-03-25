@@ -1,26 +1,24 @@
-# event
+# event ![Swift](https://img.shields.io/badge/Swift-5.9+-F05138) ![macOS](https://img.shields.io/badge/macOS-15.0+-000000)
 
-[![Swift](https://img.shields.io/badge/Swift-5.9+-F05138?style=flat&logo=swift)](https://swift.org)
-[![macOS](https://img.shields.io/badge/macOS-14.0+-000000?style=flat&logo=apple)](https://www.apple.com/macos)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Twitter Follow](https://img.shields.io/twitter/follow/FradSer?style=social)](https://twitter.com/FradSer)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Twitter Follow](https://img.shields.io/twitter/follow/FradSer?style=social)](https://twitter.com/FradSer)
+
+[English](README.md) | **简体中文**
 
 一个纯 Swift 编写的 CLI 工具，用于管理 macOS 上的 Apple 提醒事项和日历。
 
-[English](README.md) | 简体中文
-
 ## 功能特性
 
-- 提醒事项管理：创建、读取、更新和删除提醒事项
-- 日历事件：完整的日历事件 CRUD 操作
-- 列表：组织和管理提醒事项列表
-- 子任务：在提醒事项中添加和管理子任务
-- 标签：为提醒事项添加标签以便更好地组织
-- 多种输出格式：Markdown（默认）和 JSON
+- **提醒事项**：创建、读取、更新和删除提醒事项
+- **日历**：完整的日历事件 CRUD 操作
+- **列表**：组织和管理提醒事项列表
+- **子任务**：在提醒事项中添加和管理子任务
+- **标签**：为提醒事项添加标签以便组织
+- **多种格式**：Markdown（默认）和 JSON 输出
+- **云同步**：通过 `event-sync` 命令与 Cloudflare D1 同步数据
 
 ## 系统要求
 
-- macOS 14.0 或更高版本
+- macOS 15.0 或更高版本
 - Swift 5.9 或更高版本
 
 ## 安装方法
@@ -58,23 +56,85 @@ cp .build/release/event /usr/local/bin/
 - 同时也会触发提醒事项和日历的系统权限对话框
 
 或者，你也可以在系统设置中手动开启权限：
-- 系统设置 > 隐私与安全性 > 提醒事项 > 启用「终端」（或你的 Shell）
+- 系统设置 > 隐私与安全性 > 提醒事项 > 启用「终端」
 - 系统设置 > 隐私与安全性 > 日历 > 启用「终端」
+
+## 使用方法
+
+### 提醒事项
+
+```bash
+# 列出提醒事项
+event reminders list
+
+# 创建提醒事项
+event reminders create --title "购买日用品"
+
+# 创建带标签的提醒事项
+event reminders create --title "购买日用品" --tags "购物,紧急"
+
+# 标记提醒事项为已完成
+event reminders update --id <REMINDER_ID> --completed
+
+# 删除提醒事项
+event reminders delete --id <REMINDER_ID>
+```
+
+### 日历
+
+```bash
+# 列出日历事件
+event calendar list
+
+# 列出指定日期范围内的事件
+event calendar list --start "2026-03-01" --end "2026-03-31"
+
+# 创建事件
+event calendar create --title "会议" --start "2026-03-10 14:00:00" --end "2026-03-10 15:00:00"
+```
+
+### 列表
+
+```bash
+# 列出所有提醒事项列表
+event reminders lists list
+
+# 创建列表
+event reminders lists create --name "工作"
+```
+
+### 同步（Cloudflare D1）
+
+```bash
+# 配置同步（需要 Cloudflare Worker）
+event sync config --apiUrl <WORKER_URL> --apiToken <TOKEN> --deviceId <DEVICE_ID>
+
+# 将本地数据推送到云端
+event sync push --type all
+
+# 从云端拉取数据
+event sync pull --type all
+
+# 查看同步状态
+event sync status
+```
+
+更多命令请运行 `event --help`。
 
 ## Agent Skill
 
 `apple-events` skill 现已迁移到 [`FradSer/skills`](https://github.com/FradSer/skills) 仓库中，可让 AI agent 通过 `event` 直接管理你的 Apple 提醒事项和日历。
 
-1. 确保已安装 `event` CLI，并且它已在系统 PATH 中（例如 `/usr/local/bin/event`）。
-2. 从 skills 仓库安装 `apple-events` skill：
+1. 确保 `event` CLI 已安装并在系统 PATH 中。
+2. 安装 skill：
    ```bash
    npx skills add https://github.com/FradSer/skills --skill apple-events
    ```
 
-## 使用方法
+## 许可证
 
 MIT License
 
 ## 作者
 
-Frad Lee - https://frad.me
+Frad Lee - [frad.me](https://frad.me)

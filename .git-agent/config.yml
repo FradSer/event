@@ -1,0 +1,25 @@
+scopes:
+    - name: formula
+      description: Homebrew formula for the CLI
+    - name: src
+      description: Primary application source code
+    - name: wrk
+      description: Worker scripts and database schema
+    - name: bin
+      description: Executable scripts and helpers
+    - name: cli
+      description: Command line interface commands
+    - name: svc
+      description: Service layer business logic
+    - name: fmt
+      description: Output formatters
+    - name: cmd
+      description: Command handling logic
+    - name: ext
+      description: EventKit extensions
+    - name: util
+      description: Utility functions
+    - name: sync
+      description: Sync client and configuration
+    - name: mod
+      description: Domain models

@@ -21,12 +21,9 @@ extension Alarm {
         alarmType: alarmType
       )
     } else if let absoluteDate = ekAlarm.absoluteDate {
-      let formatter = DateFormatter()
-      formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-      formatter.timeZone = preferredTimeZone
       self.init(
         relativeOffset: nil,
-        absoluteDate: formatter.string(from: absoluteDate),
+        absoluteDate: DateFormatter.iso8601.string(from: absoluteDate),
         locationTrigger: nil,
         alarmType: alarmType
       )

@@ -30,9 +30,7 @@ extension CalendarEvent {
       endDate = formatter.string(from: end)
     }
 
-    let timestampFormatter = DateFormatter()
-    timestampFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-    timestampFormatter.timeZone = preferredTimeZone
+    let utcFormatter = DateFormatter.iso8601
 
     let status: String
     switch ekEvent.status {
@@ -64,8 +62,8 @@ extension CalendarEvent {
       notes: ekEvent.notes,
       url: ekEvent.url?.absoluteString,
       timeZone: ekEvent.timeZone?.identifier,
-      creationDate: ekEvent.creationDate.map { timestampFormatter.string(from: $0) },
-      lastModifiedDate: ekEvent.lastModifiedDate.map { timestampFormatter.string(from: $0) },
+      creationDate: ekEvent.creationDate.map { utcFormatter.string(from: $0) },
+      lastModifiedDate: ekEvent.lastModifiedDate.map { utcFormatter.string(from: $0) },
       status: status,
       availability: availability,
       alarms: ekEvent.alarms?.map { Alarm(from: $0, preferredTimeZone: preferredTimeZone) },

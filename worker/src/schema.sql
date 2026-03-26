@@ -25,6 +25,6 @@ CREATE TABLE IF NOT EXISTS reminder_lists (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_reminders_updated ON reminders (updated_at);
-CREATE INDEX IF NOT EXISTS idx_calendar_events_updated ON calendar_events (updated_at);
-CREATE INDEX IF NOT EXISTS idx_reminder_lists_updated ON reminder_lists (updated_at);
+CREATE INDEX IF NOT EXISTS idx_reminders_updated ON reminders (updated_at, id);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_updated ON calendar_events (updated_at, id);
+CREATE INDEX IF NOT EXISTS idx_reminder_lists_updated ON reminder_lists (updated_at, id);

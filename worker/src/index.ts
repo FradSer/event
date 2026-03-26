@@ -76,20 +76,30 @@ app.post("/api/v1/:entity/push", async (c) => {
   return c.json({ synced, skipped });
 });
 
-// Pull: incremental cursor-based fetch
+// Pull: incremental cursor-based fetch using composite (updated_at, id) cursor
 app.get("/api/v1/:entity/pull", async (c) => {
   const entity = c.req.param("entity");
   if (!ALLOWED_ENTITIES.has(entity)) {
     return c.json({ error: "Invalid entity" }, 400);
   }
 
-  const cursor = c.req.query("cursor") ?? "1970-01-01T00:00:00";
+  const rawCursor = c.req.query("cursor") ?? "";
   const limit = 101; // fetch one extra to detect has_more
 
+  let cursorTime: string;
+  let cursorId: string;
+
+  if (rawCursor.includes("|")) {
+    [cursorTime, cursorId] = rawCursor.split("|", 2);
+  } else {
+    cursorTime = rawCursor || "1970-01-01T00:00:00";
+    cursorId = "";
+  }
+
   const { results } = await c.env.DB.prepare(
-    `SELECT id, data, deleted, updated_at FROM ${entity} WHERE updated_at > ? ORDER BY updated_at ASC LIMIT ?`
+    `SELECT id, data, deleted, updated_at FROM ${entity} WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3`
   )
-    .bind(cursor, limit)
+    .bind(cursorTime, cursorId, limit)
     .all<{ id: string; data: string; deleted: number; updated_at: string }>();
 
   const hasMore = results.length === limit;
@@ -102,8 +112,8 @@ app.get("/api/v1/:entity/pull", async (c) => {
     updated_at: row.updated_at,
   }));
 
-  const newCursor =
-    items.length > 0 ? items[items.length - 1].updated_at : cursor;
+  const last = page[page.length - 1];
+  const newCursor = last ? `${last.updated_at}|${last.id}` : rawCursor;
 
   return c.json({ items, cursor: newCursor, has_more: hasMore });
 });

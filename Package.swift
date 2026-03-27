@@ -66,6 +66,11 @@ let package = Package(
       path: "Tests/EventModelsTests"
     ),
     .testTarget(
+      name: "EventSyncTests",
+      dependencies: ["EventSync"],
+      path: "Tests/EventSyncTests"
+    ),
+    .testTarget(
       name: "eventTests",
       dependencies: ["event"],
       path: "Tests/eventTests"

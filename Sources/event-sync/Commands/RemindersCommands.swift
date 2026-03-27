@@ -1,5 +1,6 @@
 import ArgumentParser
 import EventModels
+import EventSync
 import Foundation
 
 // MARK: - Reminders Commands (Linux / D1-only)
@@ -63,6 +64,11 @@ struct RemindersCommands: AsyncParsableCommand {
     var json = false
 
     func run() async throws {
+      // Validate due date if provided
+      if let due = due {
+        _ = try Date.validated(dateTimeString: due)
+      }
+
       let config = try SyncConfigStore.load()
       let client = D1SyncClient(config: config)
 

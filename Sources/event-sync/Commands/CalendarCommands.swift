@@ -1,5 +1,6 @@
 import ArgumentParser
 import EventModels
+import EventSync
 import Foundation
 
 // MARK: - Calendar Commands (Linux / D1-only)

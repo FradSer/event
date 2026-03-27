@@ -42,7 +42,7 @@ public struct SyncStatusCommand: AsyncParsableCommand {
 
     print("API URL: \(config.apiURL)")
     print("Device ID: \(config.deviceId)")
-    print("Token: \(String(config.apiToken.prefix(8)))...")
+    print("Token: \(String(config.apiToken.prefix(4)))...")
     print("")
     print("Last sync cursors:")
     print("  Reminders:       \(cursors.reminders ?? "never")")

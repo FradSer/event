@@ -25,20 +25,25 @@ struct RemindersCommands: AsyncParsableCommand {
     func run() async throws {
       let config = try SyncConfigStore.load()
       let client = D1SyncClient(config: config)
-      defer { Task { try? await client.shutdown() } }
-      var allReminders: [Reminder] = []
-      var cursor: String? = nil
-      var hasMore = true
+      do {
+        var allReminders: [Reminder] = []
+        var cursor: String? = nil
+        var hasMore = true
 
-      while hasMore {
-        let response = try await client.pullReminders(cursor: cursor)
-        allReminders += response.items.filter { !$0.deleted }.map { $0.data }
-        cursor = response.cursor
-        hasMore = response.hasMore
+        while hasMore {
+          let response = try await client.pullReminders(cursor: cursor)
+          allReminders += response.items.filter { !$0.deleted }.map { $0.data }
+          cursor = response.cursor
+          hasMore = response.hasMore
+        }
+
+        let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
+        print(formatter.format(allReminders))
+        try await client.shutdown()
+      } catch {
+        try? await client.shutdown()
+        throw error
       }
-
-      let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
-      print(formatter.format(allReminders))
     }
   }
 
@@ -72,37 +77,41 @@ struct RemindersCommands: AsyncParsableCommand {
 
       let config = try SyncConfigStore.load()
       let client = D1SyncClient(config: config)
-      defer { Task { try? await client.shutdown() } }
+      do {
+        let now = DateFormatter.eventISO8601.string(from: Date())
+        let reminder = Reminder(
+          id: UUID().uuidString,
+          title: title,
+          isCompleted: false,
+          isFlagged: false,
+          list: list,
+          notes: notes,
+          url: nil,
+          location: nil,
+          timeZone: TimeZone.current.identifier,
+          dueDate: due,
+          startDate: nil,
+          completionDate: nil,
+          creationDate: now,
+          lastModifiedDate: now,
+          externalId: nil,
+          priority: 0,
+          alarms: nil,
+          recurrenceRules: nil,
+          locationTrigger: nil
+        )
 
-      let now = DateFormatter.eventISO8601.string(from: Date())
-      let reminder = Reminder(
-        id: UUID().uuidString,
-        title: title,
-        isCompleted: false,
-        isFlagged: false,
-        list: list,
-        notes: notes,
-        url: nil,
-        location: nil,
-        timeZone: TimeZone.current.identifier,
-        dueDate: due,
-        startDate: nil,
-        completionDate: nil,
-        creationDate: now,
-        lastModifiedDate: now,
-        externalId: nil,
-        priority: 0,
-        alarms: nil,
-        recurrenceRules: nil,
-        locationTrigger: nil
-      )
-
-      let result = try await client.pushReminders([reminder])
-      if result.synced > 0 {
-        let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
-        print(formatter.format(reminder))
-      } else {
-        print("Warning: reminder was skipped (server may have a newer version)")
+        let result = try await client.pushReminders([reminder])
+        if result.synced > 0 {
+          let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
+          print(formatter.format(reminder))
+        } else {
+          print("Warning: reminder was skipped (server may have a newer version)")
+        }
+        try await client.shutdown()
+      } catch {
+        try? await client.shutdown()
+        throw error
       }
     }
   }

@@ -34,25 +34,29 @@ struct SyncCommands: AsyncParsableCommand {
     func run() async throws {
       let config = try SyncConfigStore.load()
       let service = SyncService(config: config)
-      defer { Task { try? await service.shutdown() } }
-
-      switch type {
-      case .reminders:
-        let result = try await service.pushReminders()
-        print("Reminders: synced \(result.synced), skipped \(result.skipped)")
-      case .calendar:
-        let result = try await service.pushEvents()
-        print("Calendar events: synced \(result.synced), skipped \(result.skipped)")
-      case .lists:
-        let result = try await service.pushLists()
-        print("Reminder lists: synced \(result.synced), skipped \(result.skipped)")
-      case .all:
-        let r = try await service.pushReminders()
-        let c = try await service.pushEvents()
-        let l = try await service.pushLists()
-        print("Reminders: synced \(r.synced), skipped \(r.skipped)")
-        print("Calendar events: synced \(c.synced), skipped \(c.skipped)")
-        print("Reminder lists: synced \(l.synced), skipped \(l.skipped)")
+      do {
+        switch type {
+        case .reminders:
+          let result = try await service.pushReminders()
+          print("Reminders: synced \(result.synced), skipped \(result.skipped)")
+        case .calendar:
+          let result = try await service.pushEvents()
+          print("Calendar events: synced \(result.synced), skipped \(result.skipped)")
+        case .lists:
+          let result = try await service.pushLists()
+          print("Reminder lists: synced \(result.synced), skipped \(result.skipped)")
+        case .all:
+          let r = try await service.pushReminders()
+          let c = try await service.pushEvents()
+          let l = try await service.pushLists()
+          print("Reminders: synced \(r.synced), skipped \(r.skipped)")
+          print("Calendar events: synced \(c.synced), skipped \(c.skipped)")
+          print("Reminder lists: synced \(l.synced), skipped \(l.skipped)")
+        }
+        try await service.shutdown()
+      } catch {
+        try? await service.shutdown()
+        throw error
       }
     }
   }
@@ -70,25 +74,29 @@ struct SyncCommands: AsyncParsableCommand {
     func run() async throws {
       let config = try SyncConfigStore.load()
       let service = SyncService(config: config)
-      defer { Task { try? await service.shutdown() } }
-
-      switch type {
-      case .reminders:
-        let summary = try await service.pullReminders()
-        printPullSummary("Reminders", summary: summary)
-      case .calendar:
-        let summary = try await service.pullEvents()
-        printPullSummary("Calendar events", summary: summary)
-      case .lists:
-        let summary = try await service.pullLists()
-        printPullSummary("Reminder lists", summary: summary)
-      case .all:
-        let r = try await service.pullReminders()
-        let c = try await service.pullEvents()
-        let l = try await service.pullLists()
-        printPullSummary("Reminders", summary: r)
-        printPullSummary("Calendar events", summary: c)
-        printPullSummary("Reminder lists", summary: l)
+      do {
+        switch type {
+        case .reminders:
+          let summary = try await service.pullReminders()
+          printPullSummary("Reminders", summary: summary)
+        case .calendar:
+          let summary = try await service.pullEvents()
+          printPullSummary("Calendar events", summary: summary)
+        case .lists:
+          let summary = try await service.pullLists()
+          printPullSummary("Reminder lists", summary: summary)
+        case .all:
+          let r = try await service.pullReminders()
+          let c = try await service.pullEvents()
+          let l = try await service.pullLists()
+          printPullSummary("Reminders", summary: r)
+          printPullSummary("Calendar events", summary: c)
+          printPullSummary("Reminder lists", summary: l)
+        }
+        try await service.shutdown()
+      } catch {
+        try? await service.shutdown()
+        throw error
       }
     }
 

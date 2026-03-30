@@ -1,5 +1,5 @@
-import Foundation
 import EventModels
+import Foundation
 
 // MARK: - Push Request Models
 
@@ -127,7 +127,8 @@ enum JSONValue: Codable, Sendable {
     } else {
       throw DecodingError.typeMismatch(
         JSONValue.self,
-        DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported JSON type")
+        DecodingError.Context(
+          codingPath: decoder.codingPath, debugDescription: "Unsupported JSON type")
       )
     }
   }

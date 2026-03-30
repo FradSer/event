@@ -92,27 +92,53 @@ app.post("/api/v1/:entity/push", async (c) => {
     return c.json({ error: "Missing device_id or items" }, 400);
   }
 
+  if (items.length === 0) {
+    return c.json({ synced: 0, skipped: 0 });
+  }
+
+  // Phase 1: Batch-check existing records
+  const selectStmts = items.map((item) =>
+    c.env.DB.prepare(sql.selectLastModified).bind(item.id)
+  );
+  const selectResults = await c.env.DB.batch(selectStmts);
+
+  // Phase 2: Determine writes
+  const writeStmts: D1PreparedStatement[] = [];
   let synced = 0;
   let skipped = 0;
 
-  for (const item of items) {
-    const existing = await c.env.DB.prepare(sql.selectLastModified)
-      .bind(item.id)
-      .first<{ last_modified: string }>();
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const existing = selectResults[i].results[0] as
+      | { last_modified: string }
+      | undefined;
 
     if (!existing) {
-      await c.env.DB.prepare(sql.insert)
-        .bind(item.id, JSON.stringify(item.data), item.last_modified)
-        .run();
+      writeStmts.push(
+        c.env.DB.prepare(sql.insert).bind(
+          item.id,
+          JSON.stringify(item.data),
+          item.last_modified
+        )
+      );
       synced++;
     } else if (item.last_modified >= existing.last_modified) {
-      await c.env.DB.prepare(sql.update)
-        .bind(JSON.stringify(item.data), item.last_modified, item.id)
-        .run();
+      writeStmts.push(
+        c.env.DB.prepare(sql.update).bind(
+          JSON.stringify(item.data),
+          item.last_modified,
+          item.id
+        )
+      );
       synced++;
     } else {
       skipped++;
     }
+  }
+
+  // Phase 3: Batch-execute writes
+  if (writeStmts.length > 0) {
+    await c.env.DB.batch(writeStmts);
   }
 
   return c.json({ synced, skipped });

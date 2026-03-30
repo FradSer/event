@@ -45,7 +45,8 @@ actor CalendarService {
     endDate: String,
     calendarName: String? = nil,
     location: String? = nil,
-    notes: String? = nil
+    notes: String? = nil,
+    url: String? = nil
   ) async throws -> CalendarEvent {
     try await permissionService.ensureCalendarAccess()
 
@@ -72,6 +73,9 @@ actor CalendarService {
     ekEvent.isAllDay = isAllDay
     ekEvent.location = location
     ekEvent.notes = notes
+    if let urlString = url, let validURL = URL(string: urlString) {
+      ekEvent.url = validURL
+    }
 
     // Set calendar
     if let calendarName = calendarName {
@@ -95,7 +99,8 @@ actor CalendarService {
     startDate: String? = nil,
     endDate: String? = nil,
     location: String? = nil,
-    notes: String? = nil
+    notes: String? = nil,
+    url: String? = nil
   ) async throws -> CalendarEvent {
     try await permissionService.ensureCalendarAccess()
 
@@ -123,6 +128,10 @@ actor CalendarService {
 
     if let notes = notes {
       ekEvent.notes = notes
+    }
+
+    if let urlString = url, let validURL = URL(string: urlString) {
+      ekEvent.url = validURL
     }
 
     try eventStore.save(ekEvent, span: .thisEvent, commit: true)

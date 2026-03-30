@@ -96,12 +96,15 @@ actor SyncService {
               completed: item.data.isCompleted,
               notes: item.data.notes,
               dueDate: item.data.dueDate,
+              clearDue: item.data.dueDate == nil,
               startDate: item.data.startDate,
+              clearStart: item.data.startDate == nil,
               priority: item.data.priority,
+              url: item.data.url,
               useShortcuts: false
             )
             pulled += 1
-          } catch {
+          } catch let error as EventCLIError where isNotFoundError(error) {
             do {
               let created = try await reminderService.createReminder(
                 title: item.data.title,
@@ -123,9 +126,12 @@ actor SyncService {
               idMapping.reminders[item.id] = created.id
               pulled += 1
             } catch {
-              print("Warning: Could not sync reminder \(item.id): \(error)")
+              print("Warning: Could not create reminder \(item.id): \(error)")
               hadFailures = true
             }
+          } catch {
+            print("Warning: Could not update reminder \(item.id): \(error)")
+            hadFailures = true
           }
         }
       }
@@ -136,6 +142,8 @@ actor SyncService {
         hadFailures: hadFailures
       )
       if hadFailures {
+        try SyncConfigStore.saveCursors(cursors)
+        try SyncConfigStore.saveIdMapping(idMapping)
         throw EventCLIError.unknown(
           "Pull reminders failed for one or more items. Cursor was not advanced."
         )
@@ -182,10 +190,11 @@ actor SyncService {
               startDate: item.data.startDate,
               endDate: item.data.endDate,
               location: item.data.location,
-              notes: item.data.notes
+              notes: item.data.notes,
+              url: item.data.url
             )
             pulled += 1
-          } catch {
+          } catch let error as EventCLIError where isNotFoundError(error) {
             do {
               let created = try await calendarService.createEvent(
                 title: item.data.title,
@@ -193,14 +202,18 @@ actor SyncService {
                 endDate: item.data.endDate,
                 calendarName: item.data.calendar,
                 location: item.data.location,
-                notes: item.data.notes
+                notes: item.data.notes,
+                url: item.data.url
               )
               idMapping.calendarEvents[item.id] = created.id
               pulled += 1
             } catch {
-              print("Warning: Could not sync event \(item.id): \(error)")
+              print("Warning: Could not create event \(item.id): \(error)")
               hadFailures = true
             }
+          } catch {
+            print("Warning: Could not update event \(item.id): \(error)")
+            hadFailures = true
           }
         }
       }
@@ -211,6 +224,8 @@ actor SyncService {
         hadFailures: hadFailures
       )
       if hadFailures {
+        try SyncConfigStore.saveCursors(cursors)
+        try SyncConfigStore.saveIdMapping(idMapping)
         throw EventCLIError.unknown(
           "Pull calendar events failed for one or more items. Cursor was not advanced."
         )
@@ -253,15 +268,18 @@ actor SyncService {
           do {
             _ = try await listService.updateList(id: localId, name: item.data.title)
             pulled += 1
-          } catch {
+          } catch let error as EventCLIError where isNotFoundError(error) {
             do {
               let created = try await listService.createList(name: item.data.title)
               idMapping.reminderLists[item.id] = created.id
               pulled += 1
             } catch {
-              print("Warning: Could not sync list \(item.id): \(error)")
+              print("Warning: Could not create list \(item.id): \(error)")
               hadFailures = true
             }
+          } catch {
+            print("Warning: Could not update list \(item.id): \(error)")
+            hadFailures = true
           }
         }
       }
@@ -272,6 +290,8 @@ actor SyncService {
         hadFailures: hadFailures
       )
       if hadFailures {
+        try SyncConfigStore.saveCursors(cursors)
+        try SyncConfigStore.saveIdMapping(idMapping)
         throw EventCLIError.unknown(
           "Pull reminder lists failed for one or more items. Cursor was not advanced."
         )

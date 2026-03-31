@@ -26,10 +26,7 @@ actor SyncService {
     let reminders = try await reminderService.fetchReminders(showCompleted: true)
     var idMapping = SyncConfigStore.loadIdMapping()
     var state = SyncConfigStore.loadState()
-    let localToRemote = Dictionary(
-      idMapping.reminders.map { ($0.value, $0.key) },
-      uniquingKeysWith: { first, _ in first }
-    )
+    let localToRemote = invertMapping(idMapping.reminders)
     let currentRemoteIds = Set(reminders.map { localToRemote[$0.id] ?? $0.id })
     let deletedRemoteIds = state.reminders.deletionCandidates(currentRemoteIds: currentRemoteIds)
 
@@ -61,10 +58,7 @@ actor SyncService {
     )
     var idMapping = SyncConfigStore.loadIdMapping()
     var state = SyncConfigStore.loadState()
-    let localToRemote = Dictionary(
-      idMapping.calendarEvents.map { ($0.value, $0.key) },
-      uniquingKeysWith: { first, _ in first }
-    )
+    let localToRemote = invertMapping(idMapping.calendarEvents)
     let currentRemoteIds = Set(events.map { localToRemote[$0.id] ?? $0.id })
     let deletedRemoteIds = state.calendarEvents.deletionCandidates(currentRemoteIds: currentRemoteIds)
 
@@ -89,10 +83,7 @@ actor SyncService {
     let lists = try await listService.fetchLists()
     var idMapping = SyncConfigStore.loadIdMapping()
     var state = SyncConfigStore.loadState()
-    let localToRemote = Dictionary(
-      idMapping.reminderLists.map { ($0.value, $0.key) },
-      uniquingKeysWith: { first, _ in first }
-    )
+    let localToRemote = invertMapping(idMapping.reminderLists)
     let currentRemoteIds = Set(lists.map { localToRemote[$0.id] ?? $0.id })
     let deletedRemoteIds = state.reminderLists.deletionCandidates(currentRemoteIds: currentRemoteIds)
     let fallbackLastModified = DateFormatter.eventISO8601.string(from: Date())
@@ -447,5 +438,9 @@ actor SyncService {
       return true
     }
     return false
+  }
+
+  private nonisolated func invertMapping(_ mapping: [String: String]) -> [String: String] {
+    Dictionary(mapping.map { ($0.value, $0.key) }, uniquingKeysWith: { first, _ in first })
   }
 }

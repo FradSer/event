@@ -108,18 +108,22 @@ actor CalendarService {
       throw EventCLIError.notFound("Event with ID '\(id)' not found")
     }
 
+    let dateResolution = try CalendarDateInputResolver.resolve(
+      currentIsAllDay: ekEvent.isAllDay,
+      currentStart: ekEvent.startDate ?? Date(),
+      currentEnd: ekEvent.endDate ?? Date(),
+      startInput: startDate,
+      endInput: endDate
+    )
+
     if let title = title {
       ekEvent.title = title
     }
 
-    if let startDateString = startDate {
-      let start = try Date.validated(dateTimeString: startDateString)
-      ekEvent.startDate = start
-    }
-
-    if let endDateString = endDate {
-      let end = try Date.validated(dateTimeString: endDateString)
-      ekEvent.endDate = end
+    if startDate != nil || endDate != nil {
+      ekEvent.startDate = dateResolution.start
+      ekEvent.endDate = dateResolution.end
+      ekEvent.isAllDay = dateResolution.isAllDay
     }
 
     if let location = location {

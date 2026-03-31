@@ -31,33 +31,33 @@ const ENTITY_SQL: Record<string, EntitySQL> = {
   reminders: {
     selectLastModified: "SELECT last_modified FROM reminders WHERE id = ?",
     insert:
-      "INSERT INTO reminders (id, data, last_modified, updated_at) VALUES (?, ?, ?, datetime('now'))",
+      "INSERT INTO reminders (id, data, last_modified, updated_at, source_device) VALUES (?, ?, ?, datetime('now'), ?)",
     update:
-      "UPDATE reminders SET data = ?, last_modified = ?, deleted = 0, updated_at = datetime('now') WHERE id = ?",
+      "UPDATE reminders SET data = ?, last_modified = ?, deleted = 0, updated_at = datetime('now'), source_device = ? WHERE id = ?",
     selectPage:
-      "SELECT id, data, deleted, updated_at FROM reminders WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
+      "SELECT id, data, deleted, updated_at, last_modified FROM reminders WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
     softDelete:
       "UPDATE reminders SET deleted = 1, updated_at = datetime('now') WHERE id = ?",
   },
   calendar_events: {
     selectLastModified: "SELECT last_modified FROM calendar_events WHERE id = ?",
     insert:
-      "INSERT INTO calendar_events (id, data, last_modified, updated_at) VALUES (?, ?, ?, datetime('now'))",
+      "INSERT INTO calendar_events (id, data, last_modified, updated_at, source_device) VALUES (?, ?, ?, datetime('now'), ?)",
     update:
-      "UPDATE calendar_events SET data = ?, last_modified = ?, deleted = 0, updated_at = datetime('now') WHERE id = ?",
+      "UPDATE calendar_events SET data = ?, last_modified = ?, deleted = 0, updated_at = datetime('now'), source_device = ? WHERE id = ?",
     selectPage:
-      "SELECT id, data, deleted, updated_at FROM calendar_events WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
+      "SELECT id, data, deleted, updated_at, last_modified FROM calendar_events WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
     softDelete:
       "UPDATE calendar_events SET deleted = 1, updated_at = datetime('now') WHERE id = ?",
   },
   reminder_lists: {
     selectLastModified: "SELECT last_modified FROM reminder_lists WHERE id = ?",
     insert:
-      "INSERT INTO reminder_lists (id, data, last_modified, updated_at) VALUES (?, ?, ?, datetime('now'))",
+      "INSERT INTO reminder_lists (id, data, last_modified, updated_at, source_device) VALUES (?, ?, ?, datetime('now'), ?)",
     update:
-      "UPDATE reminder_lists SET data = ?, last_modified = ?, deleted = 0, updated_at = datetime('now') WHERE id = ?",
+      "UPDATE reminder_lists SET data = ?, last_modified = ?, deleted = 0, updated_at = datetime('now'), source_device = ? WHERE id = ?",
     selectPage:
-      "SELECT id, data, deleted, updated_at FROM reminder_lists WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
+      "SELECT id, data, deleted, updated_at, last_modified FROM reminder_lists WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
     softDelete:
       "UPDATE reminder_lists SET deleted = 1, updated_at = datetime('now') WHERE id = ?",
   },
@@ -118,7 +118,8 @@ app.post("/api/v1/:entity/push", async (c) => {
         c.env.DB.prepare(sql.insert).bind(
           item.id,
           JSON.stringify(item.data),
-          item.last_modified
+          item.last_modified,
+          device_id
         )
       );
       synced++;
@@ -127,6 +128,7 @@ app.post("/api/v1/:entity/push", async (c) => {
         c.env.DB.prepare(sql.update).bind(
           JSON.stringify(item.data),
           item.last_modified,
+          device_id,
           item.id
         )
       );
@@ -166,7 +168,13 @@ app.get("/api/v1/:entity/pull", async (c) => {
 
   const { results } = await c.env.DB.prepare(sql.selectPage)
     .bind(cursorTime, cursorId, limit)
-    .all<{ id: string; data: string; deleted: number; updated_at: string }>();
+    .all<{
+      id: string;
+      data: string;
+      deleted: number;
+      updated_at: string;
+      last_modified: string;
+    }>();
 
   const hasMore = results.length === limit;
   const page = hasMore ? results.slice(0, limit - 1) : results;
@@ -176,6 +184,7 @@ app.get("/api/v1/:entity/pull", async (c) => {
     data: JSON.parse(row.data),
     deleted: row.deleted === 1,
     updated_at: row.updated_at,
+    last_modified: row.last_modified,
   }));
 
   const last = page[page.length - 1];

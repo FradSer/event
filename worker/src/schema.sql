@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS reminders (
     data TEXT NOT NULL,
     last_modified TEXT NOT NULL,
     deleted INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    source_device TEXT
 );
 
 CREATE TABLE IF NOT EXISTS calendar_events (
@@ -14,7 +15,8 @@ CREATE TABLE IF NOT EXISTS calendar_events (
     data TEXT NOT NULL,
     last_modified TEXT NOT NULL,
     deleted INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    source_device TEXT
 );
 
 CREATE TABLE IF NOT EXISTS reminder_lists (
@@ -22,7 +24,8 @@ CREATE TABLE IF NOT EXISTS reminder_lists (
     data TEXT NOT NULL,
     last_modified TEXT NOT NULL,
     deleted INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    source_device TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_reminders_updated ON reminders (updated_at, id);

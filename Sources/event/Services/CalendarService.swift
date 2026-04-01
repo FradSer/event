@@ -108,13 +108,21 @@ actor CalendarService {
     }
 
     if let startDateString = startDate {
-      let start = try Date.validated(dateTimeString: startDateString)
-      ekEvent.startDate = start
+      if Date.isAllDayFormat(startDateString) {
+        ekEvent.startDate = try Date.validated(dateString: startDateString)
+        ekEvent.isAllDay = true
+      } else {
+        ekEvent.startDate = try Date.validated(dateTimeString: startDateString)
+        ekEvent.isAllDay = false
+      }
     }
 
     if let endDateString = endDate {
-      let end = try Date.validated(dateTimeString: endDateString)
-      ekEvent.endDate = end
+      if Date.isAllDayFormat(endDateString) {
+        ekEvent.endDate = try Date.validated(dateString: endDateString)
+      } else {
+        ekEvent.endDate = try Date.validated(dateTimeString: endDateString)
+      }
     }
 
     if let location = location {

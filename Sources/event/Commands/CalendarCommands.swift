@@ -99,10 +99,16 @@ struct CalendarCommands: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "New title")
     var title: String?
 
-    @Option(name: .shortAndLong, help: "New start datetime (yyyy-MM-dd HH:mm:ss)")
+    @Option(
+      name: .shortAndLong,
+      help: "New start date (yyyy-MM-dd for all-day, yyyy-MM-dd HH:mm:ss for timed)"
+    )
     var start: String?
 
-    @Option(name: .shortAndLong, help: "New end datetime (yyyy-MM-dd HH:mm:ss)")
+    @Option(
+      name: .shortAndLong,
+      help: "New end date (yyyy-MM-dd for all-day, yyyy-MM-dd HH:mm:ss for timed)"
+    )
     var end: String?
 
     @Option(name: .shortAndLong, help: "New location")

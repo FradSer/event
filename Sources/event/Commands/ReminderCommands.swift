@@ -110,6 +110,9 @@ struct ReminderCommands: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Mark as completed")
     var completed = false
 
+    @Flag(name: .long, help: "Mark as incomplete")
+    var incomplete = false
+
     @Option(name: .shortAndLong, help: "New priority (0-9)")
     var priority: Int?
 
@@ -147,6 +150,9 @@ struct ReminderCommands: AsyncParsableCommand {
     var json = false
 
     func run() async throws {
+      if completed, incomplete {
+        throw EventCLIError.invalidInput("Use either --completed or --incomplete, not both.")
+      }
       if clearDue, due != nil {
         throw EventCLIError.invalidInput("Use either --due or --clear-due, not both.")
       }
@@ -156,10 +162,12 @@ struct ReminderCommands: AsyncParsableCommand {
 
       let service = ReminderService()
 
+      let completedValue: Bool? = completed ? true : (incomplete ? false : nil)
+
       let reminder = try await service.updateReminder(
         id: id,
         title: title,
-        completed: completed ? true : nil,
+        completed: completedValue,
         notes: notes,
         dueDate: due,
         clearDue: clearDue,

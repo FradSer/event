@@ -148,13 +148,16 @@ public actor D1SyncClient {
   }
 
   private func delete(entity: String, id: String) async throws {
-    var httpRequest = HTTPClientRequest(url: "\(config.apiURL)/api/v1/\(entity)/\(id)")
+    let encodedId = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+    var httpRequest = HTTPClientRequest(url: "\(config.apiURL)/api/v1/\(entity)/\(encodedId)")
     httpRequest.method = .DELETE
     httpRequest.headers.add(name: "Authorization", value: "Bearer \(config.apiToken)")
 
     let response = try await httpClient.execute(httpRequest, timeout: .seconds(30))
     guard response.status == .ok else {
-      throw EventCLIError.unknown("Delete failed (\(response.status.code))")
+      let responseData = try await response.body.collect(upTo: 1024 * 1024)
+      let errorBody = String(buffer: responseData)
+      throw EventCLIError.unknown("Delete failed (\(response.status.code)): \(errorBody)")
     }
   }
 }

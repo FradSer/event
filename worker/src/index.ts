@@ -17,6 +17,8 @@ type PushRequest = {
   items: PushItem[];
 };
 
+const MAX_BATCH_SIZE = 500;
+
 // Hardcoded SQL per entity to avoid any table-name injection risk.
 // Each key maps to the full set of prepared statements needed.
 type EntitySQL = {
@@ -25,6 +27,7 @@ type EntitySQL = {
   update: string;
   selectPage: string;
   softDelete: string;
+  purgeDeleted: string;
 };
 
 const ENTITY_SQL: Record<string, EntitySQL> = {
@@ -38,6 +41,8 @@ const ENTITY_SQL: Record<string, EntitySQL> = {
       "SELECT id, data, deleted, updated_at, last_modified FROM reminders WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
     softDelete:
       "UPDATE reminders SET deleted = 1, updated_at = datetime('now') WHERE id = ?",
+    purgeDeleted:
+      "DELETE FROM reminders WHERE deleted = 1 AND updated_at < datetime('now', '-30 days')",
   },
   calendar_events: {
     selectLastModified: "SELECT last_modified FROM calendar_events WHERE id = ?",
@@ -49,6 +54,8 @@ const ENTITY_SQL: Record<string, EntitySQL> = {
       "SELECT id, data, deleted, updated_at, last_modified FROM calendar_events WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
     softDelete:
       "UPDATE calendar_events SET deleted = 1, updated_at = datetime('now') WHERE id = ?",
+    purgeDeleted:
+      "DELETE FROM calendar_events WHERE deleted = 1 AND updated_at < datetime('now', '-30 days')",
   },
   reminder_lists: {
     selectLastModified: "SELECT last_modified FROM reminder_lists WHERE id = ?",
@@ -60,11 +67,26 @@ const ENTITY_SQL: Record<string, EntitySQL> = {
       "SELECT id, data, deleted, updated_at, last_modified FROM reminder_lists WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
     softDelete:
       "UPDATE reminder_lists SET deleted = 1, updated_at = datetime('now') WHERE id = ?",
+    purgeDeleted:
+      "DELETE FROM reminder_lists WHERE deleted = 1 AND updated_at < datetime('now', '-30 days')",
   },
 };
 
+const ENTITY_NAMES = Object.keys(ENTITY_SQL);
+
 function getSQL(entity: string): EntitySQL | null {
   return ENTITY_SQL[entity] ?? null;
+}
+
+// Normalize ISO 8601 timestamps to UTC for consistent string comparison.
+// Accepts formats like "2026-03-10T14:00:00Z", "2026-03-10T14:00:00+08:00",
+// or bare "2026-03-10 14:00:00" (treated as UTC).
+function normalizeTimestamp(ts: string): string {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) {
+    return ts;
+  }
+  return d.toISOString();
 }
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -96,6 +118,13 @@ app.post("/api/v1/:entity/push", async (c) => {
     return c.json({ synced: 0, skipped: 0 });
   }
 
+  if (items.length > MAX_BATCH_SIZE) {
+    return c.json(
+      { error: `Batch size ${items.length} exceeds maximum of ${MAX_BATCH_SIZE}` },
+      400
+    );
+  }
+
   // Phase 1: Batch-check existing records
   const selectStmts = items.map((item) =>
     c.env.DB.prepare(sql.selectLastModified).bind(item.id)
@@ -109,6 +138,7 @@ app.post("/api/v1/:entity/push", async (c) => {
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
+    const normalizedLM = normalizeTimestamp(item.last_modified);
     const existing = selectResults[i].results[0] as
       | { last_modified: string }
       | undefined;
@@ -118,16 +148,16 @@ app.post("/api/v1/:entity/push", async (c) => {
         c.env.DB.prepare(sql.insert).bind(
           item.id,
           JSON.stringify(item.data),
-          item.last_modified,
+          normalizedLM,
           device_id
         )
       );
       synced++;
-    } else if (item.last_modified >= existing.last_modified) {
+    } else if (normalizedLM >= normalizeTimestamp(existing.last_modified)) {
       writeStmts.push(
         c.env.DB.prepare(sql.update).bind(
           JSON.stringify(item.data),
-          item.last_modified,
+          normalizedLM,
           device_id,
           item.id
         )
@@ -205,6 +235,21 @@ app.delete("/api/v1/:entity/:id", async (c) => {
   await c.env.DB.prepare(sql.softDelete).bind(id).run();
 
   return c.json({ deleted: true });
+});
+
+// Purge soft-deleted records older than 30 days
+app.post("/api/v1/purge", async (c) => {
+  const stmts = ENTITY_NAMES.map((name) =>
+    c.env.DB.prepare(ENTITY_SQL[name].purgeDeleted)
+  );
+  const results = await c.env.DB.batch(stmts);
+
+  const purged: Record<string, number> = {};
+  for (let i = 0; i < ENTITY_NAMES.length; i++) {
+    purged[ENTITY_NAMES[i]] = results[i].meta.changes ?? 0;
+  }
+
+  return c.json({ purged });
 });
 
 export default app;

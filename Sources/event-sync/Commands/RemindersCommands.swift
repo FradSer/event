@@ -26,19 +26,9 @@ struct RemindersCommands: AsyncParsableCommand {
       let config = try SyncConfigStore.load()
       let client = D1SyncClient(config: config)
       do {
-        var allReminders: [Reminder] = []
-        var cursor: String? = nil
-        var hasMore = true
-
-        while hasMore {
-          let response = try await client.pullReminders(cursor: cursor)
-          allReminders += response.items.filter { !$0.deleted }.map { $0.data }
-          cursor = response.cursor
-          hasMore = response.hasMore
-        }
-
+        let reminders = try await client.pullAllReminders()
         let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
-        print(formatter.format(allReminders))
+        print(formatter.format(reminders))
         try await client.shutdown()
       } catch {
         try? await client.shutdown()

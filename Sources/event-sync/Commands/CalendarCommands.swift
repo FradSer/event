@@ -26,19 +26,9 @@ struct CalendarCommands: AsyncParsableCommand {
       let config = try SyncConfigStore.load()
       let client = D1SyncClient(config: config)
       do {
-        var allEvents: [CalendarEvent] = []
-        var cursor: String? = nil
-        var hasMore = true
-
-        while hasMore {
-          let response = try await client.pullEvents(cursor: cursor)
-          allEvents += response.items.filter { !$0.deleted }.map { $0.data }
-          cursor = response.cursor
-          hasMore = response.hasMore
-        }
-
+        let events = try await client.pullAllEvents()
         let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
-        print(formatter.format(allEvents))
+        print(formatter.format(events))
         try await client.shutdown()
       } catch {
         try? await client.shutdown()

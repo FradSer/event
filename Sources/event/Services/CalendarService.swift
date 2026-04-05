@@ -159,10 +159,10 @@ actor CalendarService {
     case "future":
       ekSpan = .futureEvents
     case "all":
-      ekSpan = .allEvents
+      ekSpan = .futureEvents
     default:
       throw EventCLIError.invalidInput(
-        "Invalid span '\(span)'. Must be 'this', 'future', or 'all'.")
+        "Invalid span '\(span)'. Must be 'this' or 'future'.")
     }
 
     try eventStore.remove(ekEvent, span: ekSpan, commit: true)

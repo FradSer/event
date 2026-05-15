@@ -10,6 +10,62 @@ struct ReminderCommands: AsyncParsableCommand {
     subcommands: [List.self, Create.self, Update.self, Delete.self, ListCommands.self]
   )
 
+  /// Shared `--location/--latitude/--longitude/--radius/--proximity` flags for the
+  /// commands that accept a location-based alarm.
+  struct LocationOptions: ParsableArguments {
+    @Option(name: .long, help: "Location trigger name (e.g. \"Home\")")
+    var location: String?
+
+    @Option(name: .long, help: "Location latitude (decimal degrees)")
+    var latitude: Double?
+
+    @Option(name: .long, help: "Location longitude (decimal degrees)")
+    var longitude: Double?
+
+    @Option(name: .long, help: "Geofence radius in meters (default 100)")
+    var radius: Double?
+
+    @Option(name: .long, help: "Trigger on: enter | leave (default enter)")
+    var proximity: String?
+
+    /// `true` when any of the location-related flags were supplied on the command line.
+    var isPresent: Bool {
+      location != nil || latitude != nil || longitude != nil || radius != nil || proximity != nil
+    }
+
+    /// Parse the supplied flags into a `LocationTrigger`, returning `nil` when none were
+    /// supplied. Throws `EventCLIError.invalidInput` on partial input or an unsupported
+    /// `--proximity` value.
+    func resolveTrigger() throws -> LocationTrigger? {
+      guard isPresent else { return nil }
+      guard let name = location, let lat = latitude, let lon = longitude else {
+        throw EventCLIError.invalidInput(
+          "--location, --latitude and --longitude must be provided together."
+        )
+      }
+
+      let proximityValue: LocationTrigger.Proximity
+      if let raw = proximity {
+        guard let parsed = LocationTrigger.Proximity(rawValue: raw.lowercased()) else {
+          throw EventCLIError.invalidInput(
+            "--proximity must be 'enter' or 'leave' (got '\(raw)')."
+          )
+        }
+        proximityValue = parsed
+      } else {
+        proximityValue = .enter
+      }
+
+      return LocationTrigger(
+        title: name,
+        latitude: lat,
+        longitude: lon,
+        radius: radius ?? LocationTrigger.defaultRadius,
+        proximity: proximityValue
+      )
+    }
+  }
+
   struct List: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       abstract: "List reminders"
@@ -68,20 +124,7 @@ struct ReminderCommands: AsyncParsableCommand {
     @Option(help: "Mark as flagged (true/false)")
     var flagged: Bool?
 
-    @Option(name: .long, help: "Location trigger name (e.g. \"Home\")")
-    var location: String?
-
-    @Option(name: .long, help: "Location latitude (decimal degrees)")
-    var latitude: Double?
-
-    @Option(name: .long, help: "Location longitude (decimal degrees)")
-    var longitude: Double?
-
-    @Option(name: .long, help: "Geofence radius in meters (default 100)")
-    var radius: Double?
-
-    @Option(name: .long, help: "Trigger on: enter | leave (default enter)")
-    var proximity: String?
+    @OptionGroup var locationOptions: LocationOptions
 
     @Flag(name: .long, help: "Disable Shortcut integration")
     var noShortcuts = false
@@ -90,13 +133,7 @@ struct ReminderCommands: AsyncParsableCommand {
     var json = false
 
     func run() async throws {
-      let locationTrigger = try LocationTrigger.fromCLI(
-        name: location,
-        latitude: latitude,
-        longitude: longitude,
-        radius: radius,
-        proximity: proximity
-      )
+      let locationTrigger = try locationOptions.resolveTrigger()
 
       let service = ReminderService()
 
@@ -163,20 +200,7 @@ struct ReminderCommands: AsyncParsableCommand {
     @Option(help: "Mark as flagged (true/false)")
     var flagged: Bool?
 
-    @Option(name: .long, help: "Location trigger name (e.g. \"Home\")")
-    var location: String?
-
-    @Option(name: .long, help: "Location latitude (decimal degrees)")
-    var latitude: Double?
-
-    @Option(name: .long, help: "Location longitude (decimal degrees)")
-    var longitude: Double?
-
-    @Option(name: .long, help: "Geofence radius in meters (default 100)")
-    var radius: Double?
-
-    @Option(name: .long, help: "Trigger on: enter | leave (default enter)")
-    var proximity: String?
+    @OptionGroup var locationOptions: LocationOptions
 
     @Flag(name: .long, help: "Remove existing location-based alarms")
     var clearLocation = false
@@ -194,19 +218,16 @@ struct ReminderCommands: AsyncParsableCommand {
       if clearStart, start != nil {
         throw EventCLIError.invalidInput("Use either --start or --clear-start, not both.")
       }
-
-      let locationTrigger = try LocationTrigger.fromCLI(
-        name: location,
-        latitude: latitude,
-        longitude: longitude,
-        radius: radius,
-        proximity: proximity
-      )
-      if clearLocation, locationTrigger != nil {
+      // Check against raw flag presence — not the parsed trigger — so a partial location
+      // input alongside --clear-location surfaces the more helpful mutual-exclusion error
+      // rather than the "must be provided together" one.
+      if clearLocation, locationOptions.isPresent {
         throw EventCLIError.invalidInput(
           "Use either --location/--latitude/--longitude or --clear-location, not both."
         )
       }
+
+      let locationTrigger = try locationOptions.resolveTrigger()
 
       let service = ReminderService()
 

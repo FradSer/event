@@ -303,7 +303,7 @@ actor ReminderService {
 
     // Set location-based alarm
     if let trigger = locationTrigger {
-      ekReminder.addAlarm(buildLocationAlarm(from: trigger))
+      ekReminder.addAlarm(trigger.toEKAlarm())
     }
 
     try eventStore.save(ekReminder, commit: true)
@@ -371,25 +371,17 @@ actor ReminderService {
       removeLocationAlarms(from: ekReminder)
     }
     if let trigger = locationTrigger {
-      ekReminder.addAlarm(buildLocationAlarm(from: trigger))
+      ekReminder.addAlarm(trigger.toEKAlarm())
     }
 
     try eventStore.save(ekReminder, commit: true)
   }
 
-  /// Build an `EKAlarm` configured with a structured location and proximity.
-  private func buildLocationAlarm(from trigger: LocationTrigger) -> EKAlarm {
-    let (structuredLocation, proximity) = trigger.toEKStructuredLocation()
-    let alarm = EKAlarm()
-    alarm.structuredLocation = structuredLocation
-    alarm.proximity = proximity
-    return alarm
-  }
-
   /// Remove any alarms attached to `ekReminder` that have a structured location.
+  /// Snapshots the alarms first so the underlying array is not mutated during iteration.
   private func removeLocationAlarms(from ekReminder: EKReminder) {
-    guard let alarms = ekReminder.alarms else { return }
-    for alarm in alarms where alarm.structuredLocation != nil {
+    let locationAlarms = ekReminder.alarms?.filter { $0.structuredLocation != nil } ?? []
+    for alarm in locationAlarms {
       ekReminder.removeAlarm(alarm)
     }
   }

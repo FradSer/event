@@ -1,4 +1,3 @@
-import CoreLocation
 import EventKit
 import XCTest
 
@@ -9,29 +8,39 @@ import XCTest
 /// never call `eventStore.save(...)`.
 final class ReminderServiceTests: XCTestCase {
 
+  /// Shared store — `EKEventStore()` is non-trivial to construct, and these tests
+  /// only need it as the required `EKReminder.init` dependency, never as an I/O sink.
+  private lazy var store = EKEventStore()
+
+  // MARK: - Helpers
+
+  private func makeReminder(title: String) -> EKReminder {
+    let reminder = EKReminder(eventStore: store)
+    reminder.title = title
+    return reminder
+  }
+
+  private func makeLocationAlarm(title: String) -> EKAlarm {
+    LocationTrigger(
+      title: title,
+      latitude: 22.5431,
+      longitude: 114.0579,
+      radius: 100,
+      proximity: .enter
+    ).toEKAlarm()
+  }
+
   // MARK: - removeLocationAlarms
 
   func testRemoveLocationAlarmsPreservesTimeBasedAlarms() throws {
     // Given a reminder with one time-based alarm and one location-based alarm…
-    let store = EKEventStore()
-    let reminder = EKReminder(eventStore: store)
-    reminder.title = "Mixed alarms"
-
-    let timeAlarm = EKAlarm(relativeOffset: -600)  // 10 minutes before
-    reminder.addAlarm(timeAlarm)
-
-    let structuredLocation = EKStructuredLocation(title: "Home")
-    structuredLocation.geoLocation = CLLocation(latitude: 22.5431, longitude: 114.0579)
-    structuredLocation.radius = 100
-    let locationAlarm = EKAlarm()
-    locationAlarm.structuredLocation = structuredLocation
-    locationAlarm.proximity = .enter
-    reminder.addAlarm(locationAlarm)
-
+    let reminder = makeReminder(title: "Mixed alarms")
+    reminder.addAlarm(EKAlarm(relativeOffset: -600))  // 10 minutes before
+    reminder.addAlarm(makeLocationAlarm(title: "Home"))
     XCTAssertEqual(reminder.alarms?.count, 2)
 
     // When the location alarms are removed…
-    ReminderService.removeLocationAlarms(from: reminder)
+    reminder.removeLocationAlarms()
 
     // …only the time-based alarm remains, with its offset intact.
     let remaining = reminder.alarms ?? []
@@ -42,33 +51,21 @@ final class ReminderServiceTests: XCTestCase {
 
   func testRemoveLocationAlarmsHandlesNoAlarms() {
     // Given a reminder with no alarms at all, the helper is a no-op.
-    let store = EKEventStore()
-    let reminder = EKReminder(eventStore: store)
-    reminder.title = "No alarms"
+    let reminder = makeReminder(title: "No alarms")
 
-    ReminderService.removeLocationAlarms(from: reminder)
+    reminder.removeLocationAlarms()
 
     XCTAssertTrue(reminder.alarms?.isEmpty ?? true)
   }
 
   func testRemoveLocationAlarmsHandlesOnlyLocationAlarms() {
     // Given a reminder with only location-based alarms, all of them are cleared.
-    let store = EKEventStore()
-    let reminder = EKReminder(eventStore: store)
-    reminder.title = "Location only"
-
-    for title in ["Home", "Office"] {
-      let location = EKStructuredLocation(title: title)
-      location.geoLocation = CLLocation(latitude: 22.5431, longitude: 114.0579)
-      location.radius = 100
-      let alarm = EKAlarm()
-      alarm.structuredLocation = location
-      alarm.proximity = .enter
-      reminder.addAlarm(alarm)
-    }
+    let reminder = makeReminder(title: "Location only")
+    reminder.addAlarm(makeLocationAlarm(title: "Home"))
+    reminder.addAlarm(makeLocationAlarm(title: "Office"))
     XCTAssertEqual(reminder.alarms?.count, 2)
 
-    ReminderService.removeLocationAlarms(from: reminder)
+    reminder.removeLocationAlarms()
 
     XCTAssertTrue(reminder.alarms?.isEmpty ?? true)
   }
@@ -76,24 +73,13 @@ final class ReminderServiceTests: XCTestCase {
   func testRemoveLocationAlarmsHandlesMultipleLocationAlarms() {
     // Given a reminder with one time-based alarm and two location-based alarms,
     // every location alarm is removed but the time-based one survives.
-    let store = EKEventStore()
-    let reminder = EKReminder(eventStore: store)
-    reminder.title = "Multiple location alarms"
-
+    let reminder = makeReminder(title: "Multiple location alarms")
     reminder.addAlarm(EKAlarm(relativeOffset: -300))
-
-    for title in ["Home", "Office"] {
-      let location = EKStructuredLocation(title: title)
-      location.geoLocation = CLLocation(latitude: 22.5431, longitude: 114.0579)
-      location.radius = 100
-      let alarm = EKAlarm()
-      alarm.structuredLocation = location
-      alarm.proximity = .enter
-      reminder.addAlarm(alarm)
-    }
+    reminder.addAlarm(makeLocationAlarm(title: "Home"))
+    reminder.addAlarm(makeLocationAlarm(title: "Office"))
     XCTAssertEqual(reminder.alarms?.count, 3)
 
-    ReminderService.removeLocationAlarms(from: reminder)
+    reminder.removeLocationAlarms()
 
     let remaining = reminder.alarms ?? []
     XCTAssertEqual(remaining.count, 1)

@@ -121,14 +121,21 @@ final class LocationTriggerTests: XCTestCase {
   }
 
   func testLocationTriggerInitClampsNonPositiveRadius() {
-    let trigger = LocationTrigger(
-      title: "Home",
-      latitude: 22.5431,
-      longitude: 114.0579,
-      radius: 0,
-      proximity: .enter
-    )
-    XCTAssertEqual(trigger.radius, LocationTrigger.defaultRadius)
+    // Both zero and negative radii fall back to the default — matches EKAlarm's
+    // behavior of treating non-positive radii as "no radius set".
+    for badRadius: Double in [0, -50] {
+      let trigger = LocationTrigger(
+        title: "Home",
+        latitude: 22.5431,
+        longitude: 114.0579,
+        radius: badRadius,
+        proximity: .enter
+      )
+      XCTAssertEqual(
+        trigger.radius, LocationTrigger.defaultRadius,
+        "radius=\(badRadius) should clamp to default"
+      )
+    }
   }
 
   // MARK: - LocationOptions.resolveTrigger (CLI flag parsing)
@@ -225,6 +232,54 @@ final class LocationTriggerTests: XCTestCase {
         return
       }
     }
+  }
+
+  func testLocationOptionsRejectsLatitudeOutOfRange() throws {
+    // Given a latitude above the geographic maximum
+    let options = try ReminderCommands.LocationOptions.parse([
+      "--location", "Home",
+      "--latitude", "91",
+      "--longitude", "114.0579",
+    ])
+
+    XCTAssertThrowsError(try options.resolveTrigger()) { error in
+      guard case EventCLIError.invalidInput(let message) = error else {
+        XCTFail("Expected EventCLIError.invalidInput, got \(error)")
+        return
+      }
+      XCTAssertTrue(message.contains("latitude"), "Error should mention latitude: \(message)")
+    }
+  }
+
+  func testLocationOptionsRejectsLongitudeOutOfRange() throws {
+    // Given a longitude below the geographic minimum (use `--name=value` so the
+    // leading `-` isn't parsed as a flag).
+    let options = try ReminderCommands.LocationOptions.parse([
+      "--location", "Home",
+      "--latitude", "22.5431",
+      "--longitude=-181",
+    ])
+
+    XCTAssertThrowsError(try options.resolveTrigger()) { error in
+      guard case EventCLIError.invalidInput(let message) = error else {
+        XCTFail("Expected EventCLIError.invalidInput, got \(error)")
+        return
+      }
+      XCTAssertTrue(message.contains("longitude"), "Error should mention longitude: \(message)")
+    }
+  }
+
+  func testLocationOptionsAcceptsBoundaryCoordinates() throws {
+    // Exact boundary values are valid (geographic poles, antimeridian).
+    let options = try ReminderCommands.LocationOptions.parse([
+      "--location", "Pole",
+      "--latitude", "90",
+      "--longitude", "180",
+    ])
+
+    let trigger = try XCTUnwrap(options.resolveTrigger())
+    XCTAssertEqual(trigger.latitude, 90)
+    XCTAssertEqual(trigger.longitude, 180)
   }
 
   func testLocationOptionsThrowsOnInvalidProximityValue() throws {

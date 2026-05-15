@@ -1,3 +1,4 @@
+import ArgumentParser
 import CoreLocation
 import EventKit
 import XCTest
@@ -5,6 +6,8 @@ import XCTest
 @testable import event
 
 final class LocationTriggerTests: XCTestCase {
+
+  // MARK: - init?(from: EKAlarm)
 
   func testLocationTriggerFromEKAlarmEnter() {
     let structuredLocation = EKStructuredLocation(title: "Home")
@@ -22,7 +25,7 @@ final class LocationTriggerTests: XCTestCase {
     XCTAssertEqual(trigger?.latitude, 37.7749)
     XCTAssertEqual(trigger?.longitude, -122.4194)
     XCTAssertEqual(trigger?.radius, 100)
-    XCTAssertEqual(trigger?.proximity, "enter")
+    XCTAssertEqual(trigger?.proximity, .enter)
   }
 
   func testLocationTriggerFromEKAlarmLeave() {
@@ -38,7 +41,7 @@ final class LocationTriggerTests: XCTestCase {
 
     XCTAssertNotNil(trigger)
     XCTAssertEqual(trigger?.title, "Office")
-    XCTAssertEqual(trigger?.proximity, "leave")
+    XCTAssertEqual(trigger?.proximity, .leave)
   }
 
   func testLocationTriggerFromEKAlarmNoLocation() {
@@ -48,67 +51,67 @@ final class LocationTriggerTests: XCTestCase {
     XCTAssertNil(trigger)
   }
 
-  func testLocationTriggerToEKStructuredLocationEnter() {
-    let structuredLocation = EKStructuredLocation(title: "Store")
-    structuredLocation.geoLocation = CLLocation(latitude: 34.0522, longitude: -118.2437)
-    structuredLocation.radius = 150
-
-    let ekAlarm = EKAlarm()
-    ekAlarm.structuredLocation = structuredLocation
-    ekAlarm.proximity = .enter
-
-    guard let trigger = LocationTrigger(from: ekAlarm) else {
-      XCTFail("Failed to create LocationTrigger")
-      return
-    }
-
-    let (location, proximity) = trigger.toEKStructuredLocation()
-
-    XCTAssertEqual(location.title, "Store")
-    XCTAssertEqual(location.geoLocation?.coordinate.latitude, 34.0522)
-    XCTAssertEqual(location.geoLocation?.coordinate.longitude, -118.2437)
-    XCTAssertEqual(location.radius, 150)
-    XCTAssertEqual(proximity, EKAlarmProximity.enter)
-  }
-
-  func testLocationTriggerToEKStructuredLocationLeave() {
-    let structuredLocation = EKStructuredLocation(title: "Gym")
-    structuredLocation.geoLocation = CLLocation(latitude: 51.5074, longitude: -0.1278)
+  func testLocationTriggerFromEKAlarmNoneProximityRejected() {
+    // Given an EKAlarm carrying a structured location but proximity = .none.
+    // EventKit treats `.none` as "no proximity trigger" — it isn't a location alarm
+    // we can faithfully represent.
+    let structuredLocation = EKStructuredLocation(title: "Home")
+    structuredLocation.geoLocation = CLLocation(latitude: 37.7749, longitude: -122.4194)
     structuredLocation.radius = 100
 
     let ekAlarm = EKAlarm()
     ekAlarm.structuredLocation = structuredLocation
-    ekAlarm.proximity = .leave
+    ekAlarm.proximity = .none
 
-    guard let trigger = LocationTrigger(from: ekAlarm) else {
-      XCTFail("Failed to create LocationTrigger")
-      return
-    }
-
-    let (_, proximity) = trigger.toEKStructuredLocation()
-
-    XCTAssertEqual(proximity, EKAlarmProximity.leave)
+    XCTAssertNil(LocationTrigger(from: ekAlarm))
   }
 
+  // MARK: - toEKAlarm()
+
+  func testLocationTriggerToEKAlarmEnter() throws {
+    let trigger = LocationTrigger(
+      title: "Store",
+      latitude: 34.0522,
+      longitude: -118.2437,
+      radius: 150,
+      proximity: .enter
+    )
+
+    let alarm = trigger.toEKAlarm()
+
+    let location = try XCTUnwrap(alarm.structuredLocation)
+    XCTAssertEqual(location.title, "Store")
+    XCTAssertEqual(location.geoLocation?.coordinate.latitude, 34.0522)
+    XCTAssertEqual(location.geoLocation?.coordinate.longitude, -118.2437)
+    XCTAssertEqual(location.radius, 150)
+    XCTAssertEqual(alarm.proximity, EKAlarmProximity.enter)
+  }
+
+  func testLocationTriggerToEKAlarmLeave() {
+    let trigger = LocationTrigger(
+      title: "Gym",
+      latitude: 51.5074,
+      longitude: -0.1278,
+      radius: 100,
+      proximity: .leave
+    )
+
+    XCTAssertEqual(trigger.toEKAlarm().proximity, EKAlarmProximity.leave)
+  }
+
+  // MARK: - Codable + radius sanitization
+
   func testLocationTriggerCodable() throws {
-    let structuredLocation = EKStructuredLocation(title: "Test Location")
-    structuredLocation.geoLocation = CLLocation(latitude: 35.6762, longitude: 139.6503)
-    structuredLocation.radius = 250
+    let trigger = LocationTrigger(
+      title: "Test Location",
+      latitude: 35.6762,
+      longitude: 139.6503,
+      radius: 250,
+      proximity: .enter
+    )
 
-    let ekAlarm = EKAlarm()
-    ekAlarm.structuredLocation = structuredLocation
-    ekAlarm.proximity = .enter
-
-    guard let trigger = LocationTrigger(from: ekAlarm) else {
-      XCTFail("Failed to create LocationTrigger")
-      return
-    }
-
-    let encoder = JSONEncoder()
-    let data = try encoder.encode(trigger)
-
-    let decoder = JSONDecoder()
-    let decoded = try decoder.decode(LocationTrigger.self, from: data)
+    let encoded = try JSONEncoder().encode(trigger)
+    let decoded = try JSONDecoder().decode(LocationTrigger.self, from: encoded)
 
     XCTAssertEqual(decoded.title, trigger.title)
     XCTAssertEqual(decoded.latitude, trigger.latitude)
@@ -117,66 +120,93 @@ final class LocationTriggerTests: XCTestCase {
     XCTAssertEqual(decoded.proximity, trigger.proximity)
   }
 
-  // MARK: - fromCLI
-
-  func testFromCLIReturnsNilWhenNothingProvided() throws {
-    // Given no location-related CLI options
-    // When building from CLI
-    let trigger = try LocationTrigger.fromCLI(
-      name: nil, latitude: nil, longitude: nil, radius: nil, proximity: nil
+  func testLocationTriggerInitClampsNonPositiveRadius() {
+    let trigger = LocationTrigger(
+      title: "Home",
+      latitude: 22.5431,
+      longitude: 114.0579,
+      radius: 0,
+      proximity: .enter
     )
+    XCTAssertEqual(trigger.radius, LocationTrigger.defaultRadius)
+  }
 
-    // Then no trigger is created
+  // MARK: - LocationOptions.resolveTrigger (CLI flag parsing)
+
+  func testLocationOptionsReturnsNilWhenNothingProvided() throws {
+    // Given no location flags
+    let options = try ReminderCommands.LocationOptions.parse([])
+
+    // When resolving
+    let trigger = try options.resolveTrigger()
+
+    // Then no trigger is created and isPresent is false
+    XCTAssertFalse(options.isPresent)
     XCTAssertNil(trigger)
   }
 
-  func testFromCLIAppliesDefaultsForRadiusAndProximity() throws {
-    // Given only the required triplet
-    // When building from CLI
-    let trigger = try LocationTrigger.fromCLI(
-      name: "Home", latitude: 22.5431, longitude: 114.0579, radius: nil, proximity: nil
-    )
+  func testLocationOptionsAppliesDefaultsForRadiusAndProximity() throws {
+    // Given the required triplet only
+    let options = try ReminderCommands.LocationOptions.parse([
+      "--location", "Home",
+      "--latitude", "22.5431",
+      "--longitude", "114.0579",
+    ])
+
+    // When resolving
+    let trigger = try XCTUnwrap(options.resolveTrigger())
 
     // Then defaults are applied (100m, enter)
-    XCTAssertEqual(trigger?.title, "Home")
-    XCTAssertEqual(trigger?.latitude, 22.5431)
-    XCTAssertEqual(trigger?.longitude, 114.0579)
-    XCTAssertEqual(trigger?.radius, 100)
-    XCTAssertEqual(trigger?.proximity, "enter")
+    XCTAssertEqual(trigger.title, "Home")
+    XCTAssertEqual(trigger.latitude, 22.5431)
+    XCTAssertEqual(trigger.longitude, 114.0579)
+    XCTAssertEqual(trigger.radius, LocationTrigger.defaultRadius)
+    XCTAssertEqual(trigger.proximity, .enter)
   }
 
-  func testFromCLIHonorsExplicitRadiusAndProximity() throws {
-    // Given a full CLI option set with leave + custom radius
-    // When building from CLI
-    let trigger = try LocationTrigger.fromCLI(
-      name: "Office", latitude: 40.7128, longitude: -74.0060, radius: 250, proximity: "LEAVE"
-    )
+  func testLocationOptionsHonorsExplicitRadiusAndProximity() throws {
+    // Given a full CLI option set with LEAVE (mixed case) + custom radius
+    // (negative coords use `--name=value` form so ArgumentParser doesn't read the leading
+    // `-` as another flag).
+    let options = try ReminderCommands.LocationOptions.parse([
+      "--location", "Office",
+      "--latitude", "40.7128",
+      "--longitude=-74.0060",
+      "--radius", "250",
+      "--proximity", "LEAVE",
+    ])
 
-    // Then values are honored and proximity is normalized to lowercase
-    XCTAssertEqual(trigger?.radius, 250)
-    XCTAssertEqual(trigger?.proximity, "leave")
+    // When resolving
+    let trigger = try XCTUnwrap(options.resolveTrigger())
+
+    // Then values are honored and proximity is lowercased before lookup
+    XCTAssertEqual(trigger.radius, 250)
+    XCTAssertEqual(trigger.proximity, .leave)
   }
 
-  func testFromCLIFallsBackToDefaultRadiusWhenNonPositive() throws {
-    // Given a non-positive radius
-    // When building from CLI
-    let trigger = try LocationTrigger.fromCLI(
-      name: "Home", latitude: 22.5431, longitude: 114.0579, radius: 0, proximity: nil
-    )
+  func testLocationOptionsFallsBackToDefaultRadiusWhenNonPositive() throws {
+    // Given a non-positive radius, the model-level clamp keeps it at the default.
+    let options = try ReminderCommands.LocationOptions.parse([
+      "--location", "Home",
+      "--latitude", "22.5431",
+      "--longitude", "114.0579",
+      "--radius", "0",
+    ])
 
-    // Then the radius falls back to the 100m default (matches EKAlarm coercion)
-    XCTAssertEqual(trigger?.radius, 100)
+    let trigger = try XCTUnwrap(options.resolveTrigger())
+
+    XCTAssertEqual(trigger.radius, LocationTrigger.defaultRadius)
   }
 
-  func testFromCLIThrowsWhenLatitudeIsMissing() {
-    // Given location name and longitude only
-    // When building from CLI
-    // Then an invalidInput error is thrown
-    XCTAssertThrowsError(
-      try LocationTrigger.fromCLI(
-        name: "Home", latitude: nil, longitude: 114.0579, radius: nil, proximity: nil
-      )
-    ) { error in
+  func testLocationOptionsThrowsWhenLatitudeIsMissing() throws {
+    // Given location name + longitude but no latitude
+    let options = try ReminderCommands.LocationOptions.parse([
+      "--location", "Home",
+      "--longitude", "114.0579",
+    ])
+
+    XCTAssertTrue(options.isPresent)
+    XCTAssertThrowsError(try options.resolveTrigger()) { error in
       guard case EventCLIError.invalidInput = error else {
         XCTFail("Expected EventCLIError.invalidInput, got \(error)")
         return
@@ -184,15 +214,12 @@ final class LocationTriggerTests: XCTestCase {
     }
   }
 
-  func testFromCLIThrowsWhenOnlyRadiusProvided() {
-    // Given only a radius value (an obvious mis-invocation)
-    // When building from CLI
-    // Then an invalidInput error is thrown
-    XCTAssertThrowsError(
-      try LocationTrigger.fromCLI(
-        name: nil, latitude: nil, longitude: nil, radius: 200, proximity: nil
-      )
-    ) { error in
+  func testLocationOptionsThrowsWhenOnlyRadiusProvided() throws {
+    // Given only --radius (an obvious mis-invocation)
+    let options = try ReminderCommands.LocationOptions.parse(["--radius", "200"])
+
+    XCTAssertTrue(options.isPresent)
+    XCTAssertThrowsError(try options.resolveTrigger()) { error in
       guard case EventCLIError.invalidInput = error else {
         XCTFail("Expected EventCLIError.invalidInput, got \(error)")
         return
@@ -200,19 +227,16 @@ final class LocationTriggerTests: XCTestCase {
     }
   }
 
-  func testFromCLIThrowsOnInvalidProximityValue() {
+  func testLocationOptionsThrowsOnInvalidProximityValue() throws {
     // Given an unsupported proximity value
-    // When building from CLI
-    // Then an invalidInput error is thrown
-    XCTAssertThrowsError(
-      try LocationTrigger.fromCLI(
-        name: "Home",
-        latitude: 22.5431,
-        longitude: 114.0579,
-        radius: nil,
-        proximity: "near"
-      )
-    ) { error in
+    let options = try ReminderCommands.LocationOptions.parse([
+      "--location", "Home",
+      "--latitude", "22.5431",
+      "--longitude", "114.0579",
+      "--proximity", "near",
+    ])
+
+    XCTAssertThrowsError(try options.resolveTrigger()) { error in
       guard case EventCLIError.invalidInput = error else {
         XCTFail("Expected EventCLIError.invalidInput, got \(error)")
         return
@@ -220,31 +244,25 @@ final class LocationTriggerTests: XCTestCase {
     }
   }
 
-  func testFromCLIRoundTripsThroughEKStructuredLocation() throws {
-    // Given a trigger built from CLI
-    // When converting to EKStructuredLocation + EKAlarm and back
-    let trigger = try XCTUnwrap(
-      LocationTrigger.fromCLI(
-        name: "Home",
-        latitude: 22.5431,
-        longitude: 114.0579,
-        radius: 150,
-        proximity: "enter"
-      )
-    )
+  func testLocationOptionsRoundTripsThroughEKAlarm() throws {
+    // Given a trigger built from CLI flags
+    let options = try ReminderCommands.LocationOptions.parse([
+      "--location", "Home",
+      "--latitude", "22.5431",
+      "--longitude", "114.0579",
+      "--radius", "150",
+      "--proximity", "enter",
+    ])
+    let trigger = try XCTUnwrap(options.resolveTrigger())
 
-    let (structuredLocation, proximity) = trigger.toEKStructuredLocation()
-    let alarm = EKAlarm()
-    alarm.structuredLocation = structuredLocation
-    alarm.proximity = proximity
-
-    let roundTripped = try XCTUnwrap(LocationTrigger(from: alarm))
+    // When converting to EKAlarm and back
+    let roundTripped = try XCTUnwrap(LocationTrigger(from: trigger.toEKAlarm()))
 
     // Then every field is preserved
     XCTAssertEqual(roundTripped.title, "Home")
     XCTAssertEqual(roundTripped.latitude, 22.5431)
     XCTAssertEqual(roundTripped.longitude, 114.0579)
     XCTAssertEqual(roundTripped.radius, 150)
-    XCTAssertEqual(roundTripped.proximity, "enter")
+    XCTAssertEqual(roundTripped.proximity, .enter)
   }
 }

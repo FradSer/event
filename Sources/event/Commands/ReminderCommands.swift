@@ -34,13 +34,25 @@ struct ReminderCommands: AsyncParsableCommand {
     }
 
     /// Parse the supplied flags into a `LocationTrigger`, returning `nil` when none were
-    /// supplied. Throws `EventCLIError.invalidInput` on partial input or an unsupported
-    /// `--proximity` value.
+    /// supplied. Throws `EventCLIError.invalidInput` on partial input, out-of-range
+    /// coordinates, or an unsupported `--proximity` value.
     func resolveTrigger() throws -> LocationTrigger? {
       guard isPresent else { return nil }
       guard let name = location, let lat = latitude, let lon = longitude else {
         throw EventCLIError.invalidInput(
-          "--location, --latitude and --longitude must be provided together."
+          "Location requires --location, --latitude and --longitude together "
+            + "(--radius and --proximity are optional)."
+        )
+      }
+
+      guard (-90.0...90.0).contains(lat) else {
+        throw EventCLIError.invalidInput(
+          "--latitude must be between -90 and 90 (got \(lat))."
+        )
+      }
+      guard (-180.0...180.0).contains(lon) else {
+        throw EventCLIError.invalidInput(
+          "--longitude must be between -180 and 180 (got \(lon))."
         )
       }
 

@@ -235,38 +235,17 @@ final class LocationTriggerTests: XCTestCase {
   }
 
   func testLocationOptionsRejectsLatitudeOutOfRange() throws {
-    // Given a latitude above the geographic maximum
-    let options = try ReminderCommands.LocationOptions.parse([
-      "--location", "Home",
-      "--latitude", "91",
-      "--longitude", "114.0579",
-    ])
-
-    XCTAssertThrowsError(try options.resolveTrigger()) { error in
-      guard case EventCLIError.invalidInput(let message) = error else {
-        XCTFail("Expected EventCLIError.invalidInput, got \(error)")
-        return
-      }
-      XCTAssertTrue(message.contains("latitude"), "Error should mention latitude: \(message)")
-    }
+    try assertCoordinateRejected(
+      args: ["--location", "Home", "--latitude", "91", "--longitude", "114.0579"],
+      expectedMessageSubstring: "latitude"
+    )
   }
 
   func testLocationOptionsRejectsLongitudeOutOfRange() throws {
-    // Given a longitude below the geographic minimum (use `--name=value` so the
-    // leading `-` isn't parsed as a flag).
-    let options = try ReminderCommands.LocationOptions.parse([
-      "--location", "Home",
-      "--latitude", "22.5431",
-      "--longitude=-181",
-    ])
-
-    XCTAssertThrowsError(try options.resolveTrigger()) { error in
-      guard case EventCLIError.invalidInput(let message) = error else {
-        XCTFail("Expected EventCLIError.invalidInput, got \(error)")
-        return
-      }
-      XCTAssertTrue(message.contains("longitude"), "Error should mention longitude: \(message)")
-    }
+    try assertCoordinateRejected(
+      args: ["--location", "Home", "--latitude", "22.5431", "--longitude=-181"],
+      expectedMessageSubstring: "longitude"
+    )
   }
 
   func testLocationOptionsAcceptsBoundaryCoordinates() throws {
@@ -280,6 +259,29 @@ final class LocationTriggerTests: XCTestCase {
     let trigger = try XCTUnwrap(options.resolveTrigger())
     XCTAssertEqual(trigger.latitude, 90)
     XCTAssertEqual(trigger.longitude, 180)
+  }
+
+  /// Parses `args` and asserts `resolveTrigger()` throws `invalidInput` whose message
+  /// contains `expectedMessageSubstring`. Negative coordinates must use the
+  /// `--name=value` form so ArgumentParser doesn't treat the leading `-` as a flag.
+  private func assertCoordinateRejected(
+    args: [String],
+    expectedMessageSubstring: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) throws {
+    let options = try ReminderCommands.LocationOptions.parse(args)
+    XCTAssertThrowsError(try options.resolveTrigger(), file: file, line: line) { error in
+      guard case EventCLIError.invalidInput(let message) = error else {
+        XCTFail("Expected EventCLIError.invalidInput, got \(error)", file: file, line: line)
+        return
+      }
+      XCTAssertTrue(
+        message.contains(expectedMessageSubstring),
+        "Error should mention \(expectedMessageSubstring): \(message)",
+        file: file, line: line
+      )
+    }
   }
 
   func testLocationOptionsThrowsOnInvalidProximityValue() throws {

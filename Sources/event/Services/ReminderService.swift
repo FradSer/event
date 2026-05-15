@@ -368,23 +368,12 @@ actor ReminderService {
     // Location-based alarms: clear or replace. Either operation only touches the
     // location-based alarms; existing time-based alarms are preserved.
     if clearLocation || locationTrigger != nil {
-      Self.removeLocationAlarms(from: ekReminder)
+      ekReminder.removeLocationAlarms()
     }
     if let trigger = locationTrigger {
       ekReminder.addAlarm(trigger.toEKAlarm())
     }
 
     try eventStore.save(ekReminder, commit: true)
-  }
-
-  /// Remove any alarms attached to `ekReminder` that have a structured location.
-  /// Snapshots the alarms first so the underlying array is not mutated during iteration.
-  /// `static` so it has no actor-isolated state and can be exercised in tests without
-  /// requiring Reminders access.
-  static func removeLocationAlarms(from ekReminder: EKReminder) {
-    let locationAlarms = ekReminder.alarms?.filter { $0.structuredLocation != nil } ?? []
-    for alarm in locationAlarms {
-      ekReminder.removeAlarm(alarm)
-    }
   }
 }

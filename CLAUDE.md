@@ -39,6 +39,8 @@ cd worker && wrangler dev           # local dev
 cd worker && wrangler deploy        # deploy
 cd worker && pnpm run db:migrate          # local D1 migration
 cd worker && pnpm run db:migrate:remote   # remote D1 migration
+cd worker && pnpm test                    # worker tests (vitest-pool-workers)
+cd worker && pnpm run typecheck           # worker type check
 ```
 
 ## Architecture
@@ -96,7 +98,7 @@ Custom `EventCLIError` enum provides structured errors: `permissionDenied`, `not
 
 **Config storage**: `~/.config/event-sync/` with exclusive file lock (`.lock`). Files: `config.json` (apiURL/apiToken/deviceId), `cursors.json`, `id-mapping.json` (local<->remote), `state.json`. All files mode `0o600`. API URL must be HTTPS.
 
-**Worker** (`worker/`): Hono framework on Cloudflare Workers with D1 database. Endpoints at `/api/v1/{entity}/{operation}` for push (POST), pull (GET with cursor pagination), delete (DELETE, soft-delete). Auth via `API_TOKEN` secret (Bearer token). `wrangler.toml` needs actual `database_id`.
+**Worker** (`worker/`): Hono framework on Cloudflare Workers with D1 database. Endpoints at `/api/v1/{entity}/{operation}` for push (POST), pull (GET with cursor pagination), delete (DELETE, soft-delete). Pull accepts a `device` query param so a device never pulls back its own writes. Auth via `API_TOKEN` secret (Bearer token). `wrangler.toml` needs actual `database_id`. Schema lives in `worker/migrations/` (numbered files applied via `wrangler d1 migrations apply`); a daily cron trigger purges records soft-deleted over 30 days ago.
 
 ## Code Style
 

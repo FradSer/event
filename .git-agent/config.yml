@@ -1,5 +1,5 @@
 scopes:
-    - name: src
-      description: application logic, services, models, and CLI commands in Sources/; does not cover testing
+    - name: app
+      description: application logic, models, services, and CLI commands in Sources/; does not cover testing or CI
     - name: fm
-      description: Homebrew formula definition in Formula/; does not cover repository installation logic
+      description: Homebrew formula definition for package distribution in Formula/; does not cover release workflows

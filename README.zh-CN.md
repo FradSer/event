@@ -105,29 +105,48 @@ event reminders lists create --name "工作"
 
 ### 同步（Cloudflare D1）
 
-用环境变量配置 D1 连接，然后用一条命令完成同步：
+`event sync` 通过 Cloudflare Worker（后端为 D1）在多台设备之间同步提醒事项、日历事件和列表。
+
+#### 1. 部署 Worker（一次性）
 
 ```bash
-# 配置（需要 Cloudflare Worker，详见 worker/）
+cd worker
+pnpm install
+pnpm exec wrangler login
+pnpm exec wrangler d1 create event-sync   # 把输出的 database_id 填入 wrangler.toml
+pnpm run db:migrate:remote                # 创建 D1 数据表
+pnpm exec wrangler secret put API_TOKEN   # 设置一个强随机的共享 token
+pnpm run deploy                           # 输出 https://<worker>.workers.dev
+```
+
+#### 2. 在每台设备上配置
+
+设置两个环境变量 —— 写入 `~/.zshrc`（或 `~/.bashrc`）以便跨终端持久生效：
+
+```bash
 export EVENT_SYNC_API_URL=https://<your-worker>.workers.dev
-export EVENT_SYNC_API_TOKEN=<token>
+export EVENT_SYNC_API_TOKEN=<第 1 步设置的 API_TOKEN>
 # EVENT_SYNC_DEVICE_ID 可选，未设置时默认使用主机名
 
-# 执行一次完整的双向同步（先拉取，再推送）
-event sync
-
-# 查看配置与同步状态
-event sync status
+event sync status   # 验证配置
 ```
 
 环境变量优先。未设置时，`event` 会回退到 `event sync config --api-url <URL>
 --api-token <TOKEN> --device-id <ID>` 写入的配置文件。
 
+#### 3. 同步
+
+```bash
+event sync   # 完整双向同步：先拉取，再推送
+```
+
+在每台设备上运行即可。device id（默认用主机名）区分各设备，设备不会把自己刚推送的数据又拉回来。
+
 高级用法 —— 单向 / 按类型同步：
 
 ```bash
 event sync push --type all      # 仅推送
-event sync pull --type calendar # 仅拉取,且只同步一种类型
+event sync pull --type calendar # 仅拉取，且只同步一种类型
 ```
 
 > **注意：** 日历同步仅覆盖过去一年到未来两年范围内的事件，超出该窗口的事件不会同步。

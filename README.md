@@ -105,24 +105,46 @@ event reminders lists create --name "Work"
 
 ### Sync (Cloudflare D1)
 
-Configure the D1 connection with environment variables, then sync with a single command:
+`event sync` keeps reminders, calendar events, and lists in sync across devices
+through a Cloudflare Worker backed by D1.
+
+#### 1. Deploy the Worker (one-time)
 
 ```bash
-# Configure (requires a Cloudflare Worker — see worker/)
+cd worker
+pnpm install
+pnpm exec wrangler login
+pnpm exec wrangler d1 create event-sync   # copy the database_id into wrangler.toml
+pnpm run db:migrate:remote                # create the D1 tables
+pnpm exec wrangler secret put API_TOKEN   # set a strong shared token
+pnpm run deploy                           # prints https://<worker>.workers.dev
+```
+
+#### 2. Configure each device
+
+Set two environment variables — add them to `~/.zshrc` (or `~/.bashrc`) so they
+persist across shells:
+
+```bash
 export EVENT_SYNC_API_URL=https://<your-worker>.workers.dev
-export EVENT_SYNC_API_TOKEN=<token>
+export EVENT_SYNC_API_TOKEN=<the API_TOKEN from step 1>
 # EVENT_SYNC_DEVICE_ID is optional; defaults to the machine hostname
 
-# Run a full bidirectional sync (pull, then push)
-event sync
-
-# Check configuration and sync state
-event sync status
+event sync status   # verify the configuration
 ```
 
 Environment variables take precedence. If they are unset, `event` falls back to
 a config file written by `event sync config --api-url <URL> --api-token <TOKEN>
 --device-id <ID>`.
+
+#### 3. Sync
+
+```bash
+event sync   # full bidirectional sync: pull, then push
+```
+
+Run it on each device. The device id (hostname by default) keeps devices
+distinct, and a device never pulls back its own writes.
 
 Advanced one-directional / selective sync:
 

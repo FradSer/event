@@ -1,8 +1,6 @@
--- D1 schema for event-sync
--- Run: wrangler d1 execute event-sync --file=src/schema.sql
--- To add migrations, append new statements below with a version comment.
+-- Migration 0001: initial schema
+-- Applied tracking is handled by Wrangler's d1_migrations table.
 
--- v1: initial schema
 CREATE TABLE IF NOT EXISTS reminders (
     id TEXT PRIMARY KEY,
     data TEXT NOT NULL,
@@ -33,10 +31,3 @@ CREATE TABLE IF NOT EXISTS reminder_lists (
 CREATE INDEX IF NOT EXISTS idx_reminders_updated ON reminders (updated_at, id);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_updated ON calendar_events (updated_at, id);
 CREATE INDEX IF NOT EXISTS idx_reminder_lists_updated ON reminder_lists (updated_at, id);
-
-CREATE TABLE IF NOT EXISTS schema_version (
-    version INTEGER PRIMARY KEY,
-    applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-INSERT OR IGNORE INTO schema_version (version) VALUES (1);

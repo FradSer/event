@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { bearerAuth } from "hono/bearer-auth";
 
 type Bindings = {
@@ -28,49 +29,41 @@ type EntitySQL = {
   purgeDeleted: string;
 };
 
+// `?4` is the requesting device: `source_device IS NOT ?4` excludes a device's
+// own writes (NULL-safe), and `?4 = ''` disables the filter when no device is given.
+function selectPageSQL(table: string): string {
+  return (
+    `SELECT id, data, deleted, updated_at, last_modified FROM ${table} ` +
+    "WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) " +
+    "AND (?4 = '' OR source_device IS NOT ?4) " +
+    "ORDER BY updated_at ASC, id ASC LIMIT ?3"
+  );
+}
+
+function upsertSQL(table: string): string {
+  return (
+    `INSERT INTO ${table} (id, data, last_modified, updated_at, source_device)
+      VALUES (?1, ?2, ?3, datetime('now'), ?4)
+      ON CONFLICT(id) DO UPDATE SET
+        data = excluded.data, last_modified = excluded.last_modified,
+        deleted = 0, updated_at = datetime('now'), source_device = excluded.source_device
+      WHERE ${table}.last_modified <= excluded.last_modified`
+  );
+}
+
+function entitySQL(table: string): EntitySQL {
+  return {
+    upsert: upsertSQL(table),
+    selectPage: selectPageSQL(table),
+    softDelete: `UPDATE ${table} SET deleted = 1, updated_at = datetime('now') WHERE id = ? AND last_modified <= ?`,
+    purgeDeleted: `DELETE FROM ${table} WHERE deleted = 1 AND updated_at < datetime('now', '-30 days')`,
+  };
+}
+
 const ENTITY_SQL: Record<string, EntitySQL> = {
-  reminders: {
-    upsert: `INSERT INTO reminders (id, data, last_modified, updated_at, source_device)
-      VALUES (?1, ?2, ?3, datetime('now'), ?4)
-      ON CONFLICT(id) DO UPDATE SET
-        data = excluded.data, last_modified = excluded.last_modified,
-        deleted = 0, updated_at = datetime('now'), source_device = excluded.source_device
-      WHERE reminders.last_modified <= excluded.last_modified`,
-    selectPage:
-      "SELECT id, data, deleted, updated_at, last_modified FROM reminders WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
-    softDelete:
-      "UPDATE reminders SET deleted = 1, updated_at = datetime('now') WHERE id = ? AND last_modified <= ?",
-    purgeDeleted:
-      "DELETE FROM reminders WHERE deleted = 1 AND updated_at < datetime('now', '-30 days')",
-  },
-  calendar_events: {
-    upsert: `INSERT INTO calendar_events (id, data, last_modified, updated_at, source_device)
-      VALUES (?1, ?2, ?3, datetime('now'), ?4)
-      ON CONFLICT(id) DO UPDATE SET
-        data = excluded.data, last_modified = excluded.last_modified,
-        deleted = 0, updated_at = datetime('now'), source_device = excluded.source_device
-      WHERE calendar_events.last_modified <= excluded.last_modified`,
-    selectPage:
-      "SELECT id, data, deleted, updated_at, last_modified FROM calendar_events WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
-    softDelete:
-      "UPDATE calendar_events SET deleted = 1, updated_at = datetime('now') WHERE id = ? AND last_modified <= ?",
-    purgeDeleted:
-      "DELETE FROM calendar_events WHERE deleted = 1 AND updated_at < datetime('now', '-30 days')",
-  },
-  reminder_lists: {
-    upsert: `INSERT INTO reminder_lists (id, data, last_modified, updated_at, source_device)
-      VALUES (?1, ?2, ?3, datetime('now'), ?4)
-      ON CONFLICT(id) DO UPDATE SET
-        data = excluded.data, last_modified = excluded.last_modified,
-        deleted = 0, updated_at = datetime('now'), source_device = excluded.source_device
-      WHERE reminder_lists.last_modified <= excluded.last_modified`,
-    selectPage:
-      "SELECT id, data, deleted, updated_at, last_modified FROM reminder_lists WHERE (updated_at > ?1 OR (updated_at = ?1 AND id > ?2)) ORDER BY updated_at ASC, id ASC LIMIT ?3",
-    softDelete:
-      "UPDATE reminder_lists SET deleted = 1, updated_at = datetime('now') WHERE id = ? AND last_modified <= ?",
-    purgeDeleted:
-      "DELETE FROM reminder_lists WHERE deleted = 1 AND updated_at < datetime('now', '-30 days')",
-  },
+  reminders: entitySQL("reminders"),
+  calendar_events: entitySQL("calendar_events"),
+  reminder_lists: entitySQL("reminder_lists"),
 };
 
 const ENTITY_NAMES = Object.keys(ENTITY_SQL);
@@ -79,23 +72,37 @@ function getSQL(entity: string): EntitySQL | null {
   return ENTITY_SQL[entity] ?? null;
 }
 
-// Normalize ISO 8601 timestamps to UTC for consistent string comparison.
-// Accepts formats like "2026-03-10T14:00:00Z", "2026-03-10T14:00:00+08:00",
-// or bare "2026-03-10 14:00:00" (treated as UTC).
-function normalizeTimestamp(ts: string): string {
+// Normalize an ISO 8601 timestamp to UTC for consistent string comparison.
+// Accepts "2026-03-10T14:00:00Z", "2026-03-10T14:00:00+08:00", or bare
+// "2026-03-10 14:00:00". Returns null when the input is not a valid date.
+function normalizeTimestamp(ts: string): string | null {
   const d = new Date(ts);
   if (isNaN(d.getTime())) {
-    return ts;
+    return null;
   }
   return d.toISOString();
 }
 
+// Delete soft-deleted records older than 30 days across all entities.
+async function purgeExpired(db: D1Database): Promise<Record<string, number>> {
+  const results = await db.batch(
+    ENTITY_NAMES.map((name) => db.prepare(ENTITY_SQL[name].purgeDeleted))
+  );
+  const purged: Record<string, number> = {};
+  for (let i = 0; i < ENTITY_NAMES.length; i++) {
+    purged[ENTITY_NAMES[i]] = results[i].meta.changes ?? 0;
+  }
+  return purged;
+}
+
 const app = new Hono<{ Bindings: Bindings }>();
 
-// Auth middleware for all /api/* routes
-app.use("/api/*", async (c, next) => {
-  const auth = bearerAuth({ token: c.env.API_TOKEN });
-  return auth(c, next);
+// Auth middleware for all /api/* routes. The handler is memoized per worker
+// instance since the token only changes when the worker is redeployed.
+let authMiddleware: MiddlewareHandler | undefined;
+app.use("/api/*", (c, next) => {
+  authMiddleware ??= bearerAuth({ token: c.env.API_TOKEN });
+  return authMiddleware(c, next);
 });
 
 // Health check (no auth required)
@@ -108,7 +115,12 @@ app.post("/api/v1/:entity/push", async (c) => {
     return c.json({ error: "Invalid entity" }, 400);
   }
 
-  const body = await c.req.json<PushRequest>();
+  let body: PushRequest;
+  try {
+    body = await c.req.json<PushRequest>();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
   const { device_id, items } = body;
 
   if (!device_id || !Array.isArray(items)) {
@@ -127,15 +139,24 @@ app.post("/api/v1/:entity/push", async (c) => {
   }
 
   // Atomic upsert: INSERT ... ON CONFLICT with last_modified guard
-  const stmts = items.map((item) => {
+  const stmts: D1PreparedStatement[] = [];
+  for (const item of items) {
+    if (!item || typeof item.id !== "string" || item.id.length === 0) {
+      return c.json({ error: "Each item requires a non-empty string id" }, 400);
+    }
     const normalizedLM = normalizeTimestamp(item.last_modified);
-    return c.env.DB.prepare(sql.upsert).bind(
-      item.id,
-      JSON.stringify(item.data),
-      normalizedLM,
-      device_id
+    if (normalizedLM === null) {
+      return c.json({ error: `Invalid last_modified for item '${item.id}'` }, 400);
+    }
+    stmts.push(
+      c.env.DB.prepare(sql.upsert).bind(
+        item.id,
+        JSON.stringify(item.data),
+        normalizedLM,
+        device_id
+      )
     );
-  });
+  }
 
   const results = await c.env.DB.batch(stmts);
   const synced = results.reduce((n, r) => n + (r.meta.changes ?? 0), 0);
@@ -151,6 +172,7 @@ app.get("/api/v1/:entity/pull", async (c) => {
   }
 
   const rawCursor = c.req.query("cursor") ?? "";
+  const device = c.req.query("device") ?? "";
   const limit = 101; // fetch one extra to detect has_more
 
   let cursorTime: string;
@@ -159,12 +181,13 @@ app.get("/api/v1/:entity/pull", async (c) => {
   if (rawCursor.includes("|")) {
     [cursorTime, cursorId] = rawCursor.split("|", 2);
   } else {
-    cursorTime = rawCursor || "1970-01-01T00:00:00";
+    // Sentinel matches the SQLite datetime('now') format ("YYYY-MM-DD HH:MM:SS").
+    cursorTime = rawCursor || "1970-01-01 00:00:00";
     cursorId = "";
   }
 
   const { results } = await c.env.DB.prepare(sql.selectPage)
-    .bind(cursorTime, cursorId, limit)
+    .bind(cursorTime, cursorId, limit, device)
     .all<{
       id: string;
       data: string;
@@ -199,29 +222,35 @@ app.delete("/api/v1/:entity/:id", async (c) => {
     return c.json({ error: "Invalid entity" }, 400);
   }
 
-  const body = await c.req.json<{ last_modified?: string }>().catch(() => ({}));
-  const lastModified = body.last_modified
-    ? normalizeTimestamp(body.last_modified)
-    : new Date().toISOString();
+  const body: { last_modified?: string } = await c.req
+    .json<{ last_modified?: string }>()
+    .catch(() => ({}));
+
+  let lastModified: string;
+  if (typeof body.last_modified === "string") {
+    const normalized = normalizeTimestamp(body.last_modified);
+    if (normalized === null) {
+      return c.json({ error: "Invalid last_modified" }, 400);
+    }
+    lastModified = normalized;
+  } else {
+    lastModified = new Date().toISOString();
+  }
 
   const result = await c.env.DB.prepare(sql.softDelete).bind(id, lastModified).run();
 
   return c.json({ deleted: (result.meta.changes ?? 0) > 0 });
 });
 
-// Purge soft-deleted records older than 30 days
+// Purge soft-deleted records older than 30 days (manual trigger;
+// also runs on the scheduled cron defined in wrangler.toml)
 app.post("/api/v1/purge", async (c) => {
-  const stmts = ENTITY_NAMES.map((name) =>
-    c.env.DB.prepare(ENTITY_SQL[name].purgeDeleted)
-  );
-  const results = await c.env.DB.batch(stmts);
-
-  const purged: Record<string, number> = {};
-  for (let i = 0; i < ENTITY_NAMES.length; i++) {
-    purged[ENTITY_NAMES[i]] = results[i].meta.changes ?? 0;
-  }
-
-  return c.json({ purged });
+  return c.json({ purged: await purgeExpired(c.env.DB) });
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async scheduled(_event, env) {
+    await purgeExpired(env.DB);
+  },
+} satisfies ExportedHandler<Bindings>;

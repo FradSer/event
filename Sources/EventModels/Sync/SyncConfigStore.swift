@@ -49,10 +49,66 @@ public enum SyncConfigStore {
 
   // MARK: - Config
 
+  /// Environment variable names for sync configuration.
+  public enum EnvKey {
+    public static let apiURL = "EVENT_SYNC_API_URL"
+    public static let apiToken = "EVENT_SYNC_API_TOKEN"
+    public static let deviceId = "EVENT_SYNC_DEVICE_ID"
+  }
+
+  /// Validates that an API URL uses HTTPS.
+  public static func validateAPIURL(_ apiURL: String) throws {
+    guard apiURL.lowercased().hasPrefix("https://") else {
+      throw EventCLIError.invalidInput("API URL must use HTTPS. Got: \(apiURL)")
+    }
+  }
+
+  /// Builds a `SyncConfig` from environment variables. Returns `nil` when neither
+  /// required variable is set, so the caller can fall back to the config file.
+  /// Throws when exactly one required variable is set, or the URL is not HTTPS.
+  static func loadFromEnvironment(
+    _ environment: [String: String] = ProcessInfo.processInfo.environment
+  ) throws -> SyncConfig? {
+    func value(_ key: String) -> String? {
+      guard let raw = environment[key], !raw.isEmpty else { return nil }
+      return raw
+    }
+
+    switch (value(EnvKey.apiURL), value(EnvKey.apiToken)) {
+    case (nil, nil):
+      return nil
+    case (let apiURL?, let apiToken?):
+      try validateAPIURL(apiURL)
+      let deviceId = value(EnvKey.deviceId) ?? ProcessInfo.processInfo.hostName
+      return SyncConfig(apiURL: apiURL, apiToken: apiToken, deviceId: deviceId)
+    default:
+      throw EventCLIError.invalidInput(
+        "Both \(EnvKey.apiURL) and \(EnvKey.apiToken) must be set to use "
+          + "environment-based sync config.")
+    }
+  }
+
+  /// Whether both required environment variables are set.
+  public static func hasEnvironmentConfig(
+    _ environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> Bool {
+    func isSet(_ key: String) -> Bool { !(environment[key] ?? "").isEmpty }
+    return isSet(EnvKey.apiURL) && isSet(EnvKey.apiToken)
+  }
+
+  /// Loads the sync config: environment variables take precedence, then the
+  /// config file written by `event sync config`.
   public static func load() throws -> SyncConfig {
+    if let envConfig = try loadFromEnvironment() {
+      return envConfig
+    }
     guard FileManager.default.fileExists(atPath: configPath) else {
       throw EventCLIError.notFound(
-        "Sync config not found. Run 'event sync config --api-url <URL> --api-token <TOKEN> --device-id <ID>' first."
+        """
+        Sync config not found. Either set the environment variables \
+        \(EnvKey.apiURL) and \(EnvKey.apiToken) (and optionally \(EnvKey.deviceId)), \
+        or run 'event sync config --api-url <URL> --api-token <TOKEN> --device-id <ID>'.
+        """
       )
     }
     let data = try Data(contentsOf: URL(fileURLWithPath: configPath))
@@ -60,11 +116,7 @@ public enum SyncConfigStore {
   }
 
   public static func save(_ config: SyncConfig) throws {
-    guard config.apiURL.lowercased().hasPrefix("https://") else {
-      throw EventCLIError.invalidInput(
-        "API URL must use HTTPS. Got: \(config.apiURL)"
-      )
-    }
+    try validateAPIURL(config.apiURL)
     try saveJSON(config, to: configPath)
   }
 

@@ -40,6 +40,10 @@ public struct SyncStatusCommand: AsyncParsableCommand {
     let config = try SyncConfigStore.load()
     let cursors = SyncConfigStore.loadCursors()
 
+    let source =
+      SyncConfigStore.hasEnvironmentConfig()
+      ? "environment variables" : SyncConfigStore.configPath
+    print("Config source: \(source)")
     print("API URL: \(config.apiURL)")
     print("Device ID: \(config.deviceId)")
     print("Token: \(String(config.apiToken.prefix(4)))...")

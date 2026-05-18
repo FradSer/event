@@ -7,7 +7,7 @@ struct ReminderCommands: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "reminders",
     abstract: "Manage Apple Reminders (tasks, lists, subtasks)",
-    subcommands: [List.self, Create.self, Update.self, Delete.self, ListCommands.self]
+    subcommands: [List.self, Create.self, Update.self, Delete.self, Search.self, ListCommands.self]
   )
 
   /// Shared `--location/--latitude/--longitude/--radius/--proximity` flags for the
@@ -279,6 +279,36 @@ struct ReminderCommands: AsyncParsableCommand {
       let service = ReminderService()
       try await service.deleteReminder(id: id)
       print("Reminder deleted successfully")
+    }
+  }
+
+  struct Search: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+      abstract: "Search reminders by keyword in title and notes"
+    )
+
+    @Option(name: .shortAndLong, help: "Search keyword")
+    var keyword: String
+
+    @Option(name: .shortAndLong, help: "Filter by list name")
+    var list: String?
+
+    @Flag(name: .shortAndLong, help: "Include completed reminders")
+    var completed = false
+
+    @Flag(help: "Output in JSON format")
+    var json = false
+
+    func run() async throws {
+      let service = ReminderService()
+      let reminders = try await service.searchReminders(
+        keyword: keyword,
+        listName: list,
+        showCompleted: completed
+      )
+
+      let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
+      print(formatter.format(reminders))
     }
   }
 }

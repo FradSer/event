@@ -138,6 +138,191 @@ final class LocationTriggerTests: XCTestCase {
     }
   }
 
+  // MARK: - init?(from: EKAlarm) edge cases
+
+  func testLocationTriggerFromEKAlarmNilTitleDefaultsToLocation() {
+    // Given an EKAlarm whose structured location has no title
+    let structuredLocation = EKStructuredLocation(title: nil)
+    structuredLocation.geoLocation = CLLocation(latitude: 0, longitude: 0)
+    structuredLocation.radius = 100
+
+    let ekAlarm = EKAlarm()
+    ekAlarm.structuredLocation = structuredLocation
+    ekAlarm.proximity = .enter
+
+    // When constructing a trigger
+    let trigger = LocationTrigger(from: ekAlarm)
+
+    // Then the title defaults to "Location"
+    XCTAssertNotNil(trigger)
+    XCTAssertEqual(trigger?.title, "Location")
+  }
+
+  func testLocationTriggerFromEKAlarmNoGeoLocationReturnsNil() {
+    // Given an EKAlarm with a structured location but no geoLocation
+    let structuredLocation = EKStructuredLocation(title: "Home")
+    // geoLocation is never set
+
+    let ekAlarm = EKAlarm()
+    ekAlarm.structuredLocation = structuredLocation
+    ekAlarm.proximity = .enter
+
+    // Then the trigger is nil
+    XCTAssertNil(LocationTrigger(from: ekAlarm))
+  }
+
+  func testLocationTriggerFromEKAlarmNonPositiveRadiusUsesDefault() {
+    // Given an EKAlarm whose structured location has a zero radius
+    let structuredLocation = EKStructuredLocation(title: "Home")
+    structuredLocation.geoLocation = CLLocation(latitude: 37.7749, longitude: -122.4194)
+    structuredLocation.radius = 0
+
+    let ekAlarm = EKAlarm()
+    ekAlarm.structuredLocation = structuredLocation
+    ekAlarm.proximity = .enter
+
+    // When constructing a trigger
+    let trigger = LocationTrigger(from: ekAlarm)
+
+    // Then the radius is sanitized to the default
+    XCTAssertEqual(trigger?.radius, LocationTrigger.defaultRadius)
+  }
+
+  // MARK: - Direct init edge cases
+
+  func testLocationTriggerNegativeCoordinates() {
+    let trigger = LocationTrigger(
+      title: "Southern Hemisphere",
+      latitude: -33.8688,
+      longitude: -60.1689,
+      radius: 200,
+      proximity: .leave
+    )
+
+    XCTAssertEqual(trigger.latitude, -33.8688)
+    XCTAssertEqual(trigger.longitude, -60.1689)
+  }
+
+  func testLocationTriggerBoundaryCoordinates() {
+    // Geographic poles and antimeridian are valid.
+    let northPole = LocationTrigger(
+      title: "North Pole",
+      latitude: 90,
+      longitude: 0,
+      radius: 100,
+      proximity: .enter
+    )
+    XCTAssertEqual(northPole.latitude, 90)
+
+    let southPole = LocationTrigger(
+      title: "South Pole",
+      latitude: -90,
+      longitude: 0,
+      radius: 100,
+      proximity: .enter
+    )
+    XCTAssertEqual(southPole.latitude, -90)
+
+    let antimeridian = LocationTrigger(
+      title: "Antimeridian",
+      latitude: 0,
+      longitude: 180,
+      radius: 100,
+      proximity: .enter
+    )
+    XCTAssertEqual(antimeridian.longitude, 180)
+
+    let antimeridianWest = LocationTrigger(
+      title: "Antimeridian West",
+      latitude: 0,
+      longitude: -180,
+      radius: 100,
+      proximity: .enter
+    )
+    XCTAssertEqual(antimeridianWest.longitude, -180)
+  }
+
+  func testLocationTriggerLargeRadius() {
+    let trigger = LocationTrigger(
+      title: "City",
+      latitude: 48.8566,
+      longitude: 2.3522,
+      radius: 10_000,
+      proximity: .enter
+    )
+
+    XCTAssertEqual(trigger.radius, 10_000)
+  }
+
+  func testLocationTriggerDefaultRadiusValue() {
+    XCTAssertEqual(LocationTrigger.defaultRadius, 100)
+  }
+
+  // MARK: - Proximity enum Codable
+
+  func testProximityEnumCodable() throws {
+    let enterData = try JSONEncoder().encode(LocationTrigger.Proximity.enter)
+    let decodedEnter = try JSONDecoder().decode(LocationTrigger.Proximity.self, from: enterData)
+    XCTAssertEqual(decodedEnter, .enter)
+
+    let leaveData = try JSONEncoder().encode(LocationTrigger.Proximity.leave)
+    let decodedLeave = try JSONDecoder().decode(LocationTrigger.Proximity.self, from: leaveData)
+    XCTAssertEqual(decodedLeave, .leave)
+  }
+
+  // MARK: - toEKAlarm() full verification
+
+  func testLocationTriggerToEKAlarmLeaveAllFields() throws {
+    let trigger = LocationTrigger(
+      title: "Gym",
+      latitude: 51.5074,
+      longitude: -0.1278,
+      radius: 300,
+      proximity: .leave
+    )
+
+    let alarm = trigger.toEKAlarm()
+
+    let location = try XCTUnwrap(alarm.structuredLocation)
+    XCTAssertEqual(location.title, "Gym")
+    XCTAssertEqual(location.geoLocation?.coordinate.latitude, 51.5074)
+    XCTAssertEqual(location.geoLocation?.coordinate.longitude, -0.1278)
+    XCTAssertEqual(location.radius, 300)
+    XCTAssertEqual(alarm.proximity, EKAlarmProximity.leave)
+  }
+
+  func testToEKAlarmWithSanitizedRadius() {
+    // When radius is sanitized to default, the EKAlarm should carry the default.
+    let trigger = LocationTrigger(
+      title: "Home",
+      latitude: 22.5431,
+      longitude: 114.0579,
+      radius: -10,
+      proximity: .enter
+    )
+
+    let alarm = trigger.toEKAlarm()
+
+    XCTAssertEqual(alarm.structuredLocation?.radius, LocationTrigger.defaultRadius)
+  }
+
+  func testToEKAlarmWithNegativeCoordinates() {
+    let trigger = LocationTrigger(
+      title: "Buenos Aires",
+      latitude: -34.6037,
+      longitude: -58.3816,
+      radius: 500,
+      proximity: .leave
+    )
+
+    let alarm = trigger.toEKAlarm()
+    let location = alarm.structuredLocation
+
+    XCTAssertEqual(location?.geoLocation?.coordinate.latitude, -34.6037)
+    XCTAssertEqual(location?.geoLocation?.coordinate.longitude, -58.3816)
+    XCTAssertEqual(alarm.proximity, EKAlarmProximity.leave)
+  }
+
   // MARK: - LocationOptions.resolveTrigger (CLI flag parsing)
 
   func testLocationOptionsReturnsNilWhenNothingProvided() throws {

@@ -141,6 +141,20 @@ actor ReminderService {
     return try fetchReminder(id: id)
   }
 
+  /// Search reminders by keyword in title and notes
+  func searchReminders(
+    keyword: String,
+    listName: String? = nil,
+    showCompleted: Bool = false
+  ) async throws -> [Reminder] {
+    let reminders = try await fetchReminders(listName: listName, showCompleted: showCompleted)
+    let lowercased = keyword.lowercased()
+    return reminders.filter { reminder in
+      reminder.title.lowercased().contains(lowercased)
+        || (reminder.notes?.lowercased().contains(lowercased) ?? false)
+    }
+  }
+
   /// Delete a reminder
   func deleteReminder(id: String) async throws {
     try await permissionService.ensureRemindersAccess()

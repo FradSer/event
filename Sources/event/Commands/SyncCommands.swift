@@ -27,7 +27,12 @@ struct SyncCommands: AsyncParsableCommand {
 
   struct Push: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-      abstract: "Push local data to Cloudflare D1"
+      abstract: "Push local data to Cloudflare D1",
+      discussion: """
+        Calendar events are synced only within a window from one year in the \
+        past to two years ahead; events outside this window are not synced. \
+        Reminders and reminder lists are not windowed.
+        """
     )
 
     @Option(help: "Type to sync: reminders, calendar, lists, all")
@@ -92,7 +97,13 @@ struct SyncCommands: AsyncParsableCommand {
 
   struct Pull: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-      abstract: "Pull data from Cloudflare D1"
+      abstract: "Pull data from Cloudflare D1",
+      discussion: """
+        Calendar events are synced only within a window from one year in the \
+        past to two years ahead. Conflicts resolve by last-write-wins: a pull \
+        never overwrites a local copy modified more recently than the \
+        server's version, and that copy is pushed on the next sync.
+        """
     )
 
     @Option(help: "Type to sync: reminders, calendar, lists, all")

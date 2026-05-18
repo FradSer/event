@@ -155,7 +155,9 @@ struct SyncCommands: AsyncParsableCommand {
         ]
         for (key, label) in labels {
           if let summary = output[key] {
-            print("\(label): pulled \(summary.pulled), deleted \(summary.deleted)")
+            print(
+              "\(label): pulled \(summary.pulled), deleted \(summary.deleted), "
+                + "skipped \(summary.skipped)")
           }
         }
       }

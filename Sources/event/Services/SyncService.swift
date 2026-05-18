@@ -74,22 +74,17 @@ actor SyncService {
   }
 
   func pushEvents() async throws -> PushResult {
-    // Syncs events from -1 year to +2 years. Events outside this window are excluded.
-    let start = Calendar.current.date(byAdding: .year, value: -1, to: Date()) ?? Date()
-    let end = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
-    let dateFormatter = DateFormatter()
-    dateFormatter.dateFormat = "yyyy-MM-dd"
-    let startString = dateFormatter.string(from: start)
-    let endString = dateFormatter.string(from: end)
+    // Syncs events within `eventSyncWindow()`. Events outside this window are excluded.
+    let window = eventSyncWindow()
     let events = try await calendarService.fetchEvents(
-      startDate: startString,
-      endDate: endString
+      startDate: window.start,
+      endDate: window.end
     )
     var idMapping = SyncConfigStore.loadIdMapping()
     var state = SyncConfigStore.loadState()
     let localToRemote = invertMapping(idMapping.calendarEvents)
     let currentRemoteIds = Set(events.map { localToRemote[$0.id] ?? $0.id })
-    let fetchWindow = SyncDateRange(start: startString, end: endString)
+    let fetchWindow = SyncDateRange(start: window.start, end: window.end)
     let deletedRemoteIds = state.calendarEvents.deletionCandidates(
       currentRemoteIds: currentRemoteIds,
       withinRange: fetchWindow
@@ -197,8 +192,13 @@ actor SyncService {
   // MARK: - Pull
 
   func pullReminders() async throws -> PullSummary {
-    try await pullEntities(
+    let localReminders = try await reminderService.fetchReminders(showCompleted: true)
+    let localLastModified = lastModifiedIndex(
+      localReminders.map { (id: $0.id, lastModified: $0.lastModifiedDate) })
+
+    return try await pullEntities(
       entityName: "reminders",
+      localLastModifiedById: localLastModified,
       pull: { cursor in try await self.syncClient.pullReminders(cursor: cursor) },
       getCursor: { $0.reminders },
       setCursor: { $0.reminders = $1 },
@@ -257,8 +257,17 @@ actor SyncService {
   }
 
   func pullEvents() async throws -> PullSummary {
-    try await pullEntities(
+    let window = eventSyncWindow()
+    let localEvents = try await calendarService.fetchEvents(
+      startDate: window.start,
+      endDate: window.end
+    )
+    let localLastModified = lastModifiedIndex(
+      localEvents.map { (id: $0.id, lastModified: $0.lastModifiedDate) })
+
+    return try await pullEntities(
       entityName: "calendar events",
+      localLastModifiedById: localLastModified,
       pull: { cursor in try await self.syncClient.pullEvents(cursor: cursor) },
       getCursor: { $0.calendarEvents },
       setCursor: { $0.calendarEvents = $1 },
@@ -304,8 +313,11 @@ actor SyncService {
   }
 
   func pullLists() async throws -> PullSummary {
+    // Reminder lists carry no modification timestamp, so the pull always
+    // applies the server value (an empty conflict index disables the guard).
     try await pullEntities(
       entityName: "reminder lists",
+      localLastModifiedById: [:],
       pull: { cursor in try await self.syncClient.pullLists(cursor: cursor) },
       getCursor: { $0.reminderLists },
       setCursor: { $0.reminderLists = $1 },
@@ -338,6 +350,7 @@ actor SyncService {
 
   private func pullEntities<T: Codable & Sendable>(
     entityName: String,
+    localLastModifiedById: [String: String],
     pull: (String?) async throws -> PullResponse<T>,
     getCursor: (SyncCursors) -> String?,
     setCursor: (inout SyncCursors, String?) -> Void,
@@ -354,10 +367,26 @@ actor SyncService {
     var entityState = getEntityState(state)
     var pulled = 0
     var deleted = 0
+    var skipped = 0
     var hasMore = true
 
+    func persist() throws {
+      setEntityState(&state, entityState)
+      try SyncConfigStore.saveCursors(cursors)
+      try SyncConfigStore.saveIdMapping(idMapping)
+      try SyncConfigStore.saveState(state)
+    }
+
     while hasMore {
-      let response = try await pull(getCursor(cursors))
+      let response: PullResponse<T>
+      do {
+        response = try await pull(getCursor(cursors))
+      } catch {
+        // Persist progress from earlier pages so created items keep their ID
+        // mapping; otherwise a retry would create duplicate local entities.
+        try? persist()
+        throw error
+      }
       hasMore = response.hasMore
       var hadFailures = false
 
@@ -377,22 +406,37 @@ actor SyncService {
           setMapping(&idMapping, item.id, nil)
           entityState.removeRemoteId(item.id)
           deleted += 1
-        } else {
-          do {
-            let newLocalId = try await applyUpsert(localId, item)
-            if let newLocalId {
-              setMapping(&idMapping, item.id, newLocalId)
-            }
-            try entityState.recordSyncedValue(
-              item.data,
-              remoteId: item.id,
-              lastModified: item.lastModified
-            )
-            pulled += 1
-          } catch {
-            fputs("Warning: Could not sync \(entityName) \(item.id): \(error)\n", stderr)
-            hadFailures = true
+          continue
+        }
+
+        // Conflict guard: never overwrite a local copy that was modified more
+        // recently than the server's version -- it is pushed on the next sync.
+        if let localValue = localLastModifiedById[localId],
+          let localModified = SyncTimestamp.parse(localValue),
+          let serverModified = SyncTimestamp.parse(item.lastModified),
+          localModified > serverModified
+        {
+          fputs(
+            "Skipped \(entityName) \(item.id): local copy is newer; it will be pushed on next sync\n",
+            stderr)
+          skipped += 1
+          continue
+        }
+
+        do {
+          let newLocalId = try await applyUpsert(localId, item)
+          if let newLocalId {
+            setMapping(&idMapping, item.id, newLocalId)
           }
+          try entityState.recordSyncedValue(
+            item.data,
+            remoteId: item.id,
+            lastModified: item.lastModified
+          )
+          pulled += 1
+        } catch {
+          fputs("Warning: Could not sync \(entityName) \(item.id): \(error)\n", stderr)
+          hadFailures = true
         }
       }
 
@@ -404,26 +448,43 @@ actor SyncService {
           hadFailures: hadFailures
         )
       )
-      setEntityState(&state, entityState)
+      // Persist after every page so a later network failure cannot strand
+      // already-applied items without their ID mapping.
+      try persist()
 
       if hadFailures {
-        try SyncConfigStore.saveCursors(cursors)
-        try SyncConfigStore.saveIdMapping(idMapping)
-        try SyncConfigStore.saveState(state)
         throw EventCLIError.unknown(
           "Pull \(entityName) failed for one or more items. Cursor was not advanced."
         )
       }
     }
 
-    setEntityState(&state, entityState)
-    try SyncConfigStore.saveCursors(cursors)
-    try SyncConfigStore.saveIdMapping(idMapping)
-    try SyncConfigStore.saveState(state)
-    return PullSummary(pulled: pulled, deleted: deleted)
+    return PullSummary(pulled: pulled, deleted: deleted, skipped: skipped)
   }
 
   // MARK: - Helpers
+
+  /// The calendar window synced by push and pull: one year back to two years ahead.
+  private nonisolated func eventSyncWindow() -> (start: String, end: String) {
+    let start = Calendar.current.date(byAdding: .year, value: -1, to: Date()) ?? Date()
+    let end = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    return (formatter.string(from: start), formatter.string(from: end))
+  }
+
+  /// Builds a `localId -> lastModified` index, dropping entries without a timestamp.
+  private nonisolated func lastModifiedIndex(
+    _ pairs: [(id: String, lastModified: String?)]
+  ) -> [String: String] {
+    var index: [String: String] = [:]
+    for pair in pairs {
+      if let lastModified = pair.lastModified {
+        index[pair.id] = lastModified
+      }
+    }
+    return index
+  }
 
   private func ensureReminderListExists(named listName: String) async throws {
     let normalizedName = listName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -447,16 +508,13 @@ actor SyncService {
   }
 
   private nonisolated func invertMapping(_ mapping: [String: String]) -> [String: String] {
-    var inverted: [String: String] = [:]
-    inverted.reserveCapacity(mapping.count)
-    for (remote, local) in mapping {
-      if let existing = inverted[local] {
-        fputs(
-          "Warning: duplicate ID mapping -- local '\(local)' maps to both '\(existing)' and '\(remote)'\n",
-          stderr)
-      }
-      inverted[local] = remote
+    let result = SyncIdMapping.inverted(mapping)
+    for collision in result.collisions {
+      fputs(
+        "Warning: duplicate ID mapping -- local '\(collision.localId)' maps to both "
+          + "'\(collision.keptRemoteId)' and '\(collision.droppedRemoteId)'\n",
+        stderr)
     }
-    return inverted
+    return result.mapping
   }
 }

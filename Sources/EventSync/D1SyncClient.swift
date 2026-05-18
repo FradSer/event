@@ -7,6 +7,9 @@ import NIOFoundationCompat
 // MARK: - D1 Sync Client
 
 public actor D1SyncClient {
+  /// Must stay in sync with `MAX_BATCH_SIZE` in the Cloudflare Worker.
+  private static let maxBatchSize = 500
+
   private let config: SyncConfig
   private let httpClient: HTTPClient
 
@@ -15,6 +18,17 @@ public actor D1SyncClient {
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return formatter
   }()
+
+  /// `urlQueryAllowed` minus the separators that must be escaped inside a value.
+  private static let queryValueAllowed: CharacterSet = {
+    var set = CharacterSet.urlQueryAllowed
+    set.remove(charactersIn: "&=+")
+    return set
+  }()
+
+  private static func encodeQuery(_ value: String) -> String {
+    value.addingPercentEncoding(withAllowedCharacters: queryValueAllowed) ?? value
+  }
 
   public init(config: SyncConfig) {
     self.config = config
@@ -46,7 +60,7 @@ public actor D1SyncClient {
   }
 
   public func pullReminders(cursor: String?) async throws -> PullResponse<Reminder> {
-    return try await pull(entity: "reminders", cursor: cursor)
+    return try await pull(entity: "reminders", cursor: cursor, excludeOwnWrites: true)
   }
 
   // MARK: - Calendar Events
@@ -69,7 +83,7 @@ public actor D1SyncClient {
   }
 
   public func pullEvents(cursor: String?) async throws -> PullResponse<CalendarEvent> {
-    return try await pull(entity: "calendar_events", cursor: cursor)
+    return try await pull(entity: "calendar_events", cursor: cursor, excludeOwnWrites: true)
   }
 
   // MARK: - Reminder Lists
@@ -92,21 +106,29 @@ public actor D1SyncClient {
   }
 
   public func pullLists(cursor: String?) async throws -> PullResponse<ReminderList> {
-    return try await pull(entity: "reminder_lists", cursor: cursor)
+    return try await pull(entity: "reminder_lists", cursor: cursor, excludeOwnWrites: true)
   }
 
   // MARK: - Pull All (convenience for paginated reads)
 
+  // These read every record regardless of origin device, so the own-writes
+  // filter is disabled (a Linux-only client expects to see all entities).
   public func pullAllReminders() async throws -> [Reminder] {
-    try await pullAll { cursor in try await self.pullReminders(cursor: cursor) }
+    try await pullAll { cursor in
+      try await self.pull(entity: "reminders", cursor: cursor, excludeOwnWrites: false)
+    }
   }
 
   public func pullAllEvents() async throws -> [CalendarEvent] {
-    try await pullAll { cursor in try await self.pullEvents(cursor: cursor) }
+    try await pullAll { cursor in
+      try await self.pull(entity: "calendar_events", cursor: cursor, excludeOwnWrites: false)
+    }
   }
 
   public func pullAllLists() async throws -> [ReminderList] {
-    try await pullAll { cursor in try await self.pullLists(cursor: cursor) }
+    try await pullAll { cursor in
+      try await self.pull(entity: "reminder_lists", cursor: cursor, excludeOwnWrites: false)
+    }
   }
 
   private func pullAll<T: Codable & Sendable>(
@@ -140,7 +162,28 @@ public actor D1SyncClient {
 
   // MARK: - Generic HTTP Methods
 
+  /// Pushes items in batches of `maxBatchSize` so payloads of any size stay
+  /// within the Worker's per-request batch limit.
   private func push<T: Codable>(entity: String, items: [PushRequestItem<T>]) async throws
+    -> PushResult
+  {
+    guard !items.isEmpty else {
+      return PushResult(synced: 0, skipped: 0)
+    }
+    var synced = 0
+    var skipped = 0
+    var offset = 0
+    while offset < items.count {
+      let chunk = Array(items[offset..<min(offset + Self.maxBatchSize, items.count)])
+      let result = try await pushBatch(entity: entity, items: chunk)
+      synced += result.synced
+      skipped += result.skipped
+      offset += Self.maxBatchSize
+    }
+    return PushResult(synced: synced, skipped: skipped)
+  }
+
+  private func pushBatch<T: Codable>(entity: String, items: [PushRequestItem<T>]) async throws
     -> PushResult
   {
     let request = PushRequest(deviceId: config.deviceId, items: items)
@@ -164,14 +207,23 @@ public actor D1SyncClient {
     return try JSONDecoder().decode(PushResult.self, from: Data(buffer: responseData))
   }
 
-  private func pull<T: Codable>(entity: String, cursor: String?) async throws -> PullResponse<T> {
-    let cursorParam =
-      cursor.map {
-        "?cursor=\($0.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0)"
-      }
-      ?? ""
+  private func pull<T: Codable>(
+    entity: String,
+    cursor: String?,
+    excludeOwnWrites: Bool
+  ) async throws -> PullResponse<T> {
+    // The `device` filter makes the Worker exclude this device's own writes,
+    // so a syncing device never pulls back what it just pushed.
+    var queryItems: [String] = []
+    if excludeOwnWrites {
+      queryItems.append("device=\(Self.encodeQuery(config.deviceId))")
+    }
+    if let cursor {
+      queryItems.append("cursor=\(Self.encodeQuery(cursor))")
+    }
+    let queryString = queryItems.isEmpty ? "" : "?\(queryItems.joined(separator: "&"))"
     var httpRequest = HTTPClientRequest(
-      url: "\(config.apiURL)/api/v1/\(entity)/pull\(cursorParam)"
+      url: "\(config.apiURL)/api/v1/\(entity)/pull\(queryString)"
     )
     httpRequest.method = .GET
     httpRequest.headers.add(name: "Authorization", value: "Bearer \(config.apiToken)")

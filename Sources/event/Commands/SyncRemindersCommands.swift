@@ -3,12 +3,14 @@ import EventModels
 import EventSync
 import Foundation
 
-// MARK: - Reminders Commands (Linux / D1-only)
+// MARK: - Sync Reminders Commands (D1-direct)
 
-struct RemindersCommands: AsyncParsableCommand {
+/// Reads and writes reminders directly in Cloudflare D1, bypassing local
+/// EventKit. Distinct from `event reminders`, which operates on local Apple data.
+struct SyncRemindersCommands: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "reminders",
-    abstract: "Manage reminders via Cloudflare D1",
+    abstract: "Read or write reminders directly in Cloudflare D1",
     subcommands: [List.self, Create.self]
   )
 
@@ -16,7 +18,7 @@ struct RemindersCommands: AsyncParsableCommand {
 
   struct List: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-      abstract: "List reminders from D1"
+      abstract: "List reminders stored in Cloudflare D1"
     )
 
     @Flag(help: "Output in JSON format")
@@ -41,7 +43,7 @@ struct RemindersCommands: AsyncParsableCommand {
 
   struct Create: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-      abstract: "Create a reminder in D1 (Linux-originated)"
+      abstract: "Create a reminder directly in Cloudflare D1"
     )
 
     @Option(name: .shortAndLong, help: "Reminder title")

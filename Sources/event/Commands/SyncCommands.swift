@@ -22,6 +22,7 @@ struct SyncCommands: AsyncParsableCommand {
     abstract: "Sync event data with Cloudflare D1",
     subcommands: [
       FullSync.self, Push.self, Pull.self, SyncConfigCommand.self, SyncStatusCommand.self,
+      SyncRemindersCommands.self, SyncCalendarCommands.self,
     ],
     defaultSubcommand: FullSync.self
   )
@@ -40,8 +41,9 @@ struct SyncCommands: AsyncParsableCommand {
         copy modified more recently than the server's version.
 
         Advanced subcommands (run 'event sync <name> --help'): 'push' and \
-        'pull' for one-directional sync, 'config' to save credentials to a \
-        file, 'status' to inspect configuration and sync state.
+        'pull' for one-directional sync; 'config' and 'status' to manage \
+        configuration; 'reminders' and 'calendar' to read or write Cloudflare \
+        D1 data directly.
         """
     )
 

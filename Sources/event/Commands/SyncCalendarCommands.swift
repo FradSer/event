@@ -3,12 +3,14 @@ import EventModels
 import EventSync
 import Foundation
 
-// MARK: - Calendar Commands (Linux / D1-only)
+// MARK: - Sync Calendar Commands (D1-direct)
 
-struct CalendarCommands: AsyncParsableCommand {
+/// Reads calendar events directly from Cloudflare D1, bypassing local EventKit.
+/// Distinct from `event calendar`, which operates on local Apple data.
+struct SyncCalendarCommands: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "calendar",
-    abstract: "Read calendar events from Cloudflare D1",
+    abstract: "Read calendar events directly from Cloudflare D1",
     subcommands: [List.self]
   )
 
@@ -16,7 +18,7 @@ struct CalendarCommands: AsyncParsableCommand {
 
   struct List: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-      abstract: "List calendar events from D1"
+      abstract: "List calendar events stored in Cloudflare D1"
     )
 
     @Flag(help: "Output in JSON format")

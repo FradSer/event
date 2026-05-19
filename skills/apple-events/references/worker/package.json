@@ -1,0 +1,27 @@
+{
+  "name": "event-sync-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/tsconfig.json --noEmit",
+    "db:migrate": "wrangler d1 migrations apply event-sync --local",
+    "db:migrate:remote": "wrangler d1 migrations apply event-sync --remote"
+  },
+  "dependencies": {
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.16.6",
+    "@cloudflare/workers-types": "^4.20260518.1",
+    "typescript": "^5.5.0",
+    "vitest": "~4.1.6",
+    "wrangler": "^4.92.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "sharp", "workerd"]
+  }
+}

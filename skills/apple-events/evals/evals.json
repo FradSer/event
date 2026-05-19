@@ -1,0 +1,57 @@
+{
+  "skill_name": "apple-events",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "List all my incomplete reminders.",
+      "expected_output": "A list of incomplete reminders obtained by running `event reminders list`",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Returns valid list",
+          "description": "The output file `reminders.md` exists and contains a valid list of reminders, or a message saying no reminders were found."
+        },
+        {
+          "name": "Only incomplete",
+          "description": "The output does not contain any completed reminders (checkboxes with [x])."
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create a new reminder titled 'Review PR' in the 'Work' list, set priority to High, and mark it as flagged.",
+      "expected_output": "Creates a reminder using the `event reminders create` command with the appropriate flags.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Created successfully",
+          "description": "The output file `creation_result.md` exists and shows a successful creation of a reminder titled 'Review PR'."
+        },
+        {
+          "name": "List matches",
+          "description": "The reminder was created in the 'Work' list."
+        },
+        {
+          "name": "Priority matches",
+          "description": "The reminder has high priority."
+        },
+        {
+          "name": "Flagged status matches",
+          "description": "The reminder is marked as flagged."
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "What's on my calendar for the next 3 days?",
+      "expected_output": "A list of calendar events obtained by running `event calendar list` with appropriate date range flags.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Returns valid list",
+          "description": "The output file `calendar_events.md` exists and contains a list of calendar events, or a message saying none were found."
+        }
+      ]
+    }
+  ]
+}

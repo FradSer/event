@@ -55,11 +55,10 @@ Pure Swift CLI for managing Apple Reminders and Calendar via EventKit, with Clou
 | `EventModels` | Library | Shared domain models, formatters, sync DTOs, utilities |
 | `EventSync` | Library | `D1SyncClient` HTTP client for Cloudflare D1 |
 | `EventCommands` | Library | Shared command helpers |
-| `event` | Executable | Main CLI (reminders, calendar, sync commands) |
-| `event-sync` | Executable | Standalone sync tool |
+| `event` | Executable | The CLI (reminders, calendar, sync commands) |
 | `skills/apple-events/references/worker/` | TypeScript | Cloudflare Worker API (Hono + D1) |
 
-Dependencies flow inward: Commands -> Services -> EventKit. Both executables require `-parse-as-library` compiler flag (set in Package.swift) for ArgumentParser `@main`.
+Dependencies flow inward: Commands -> Services -> EventKit. The `event` executable requires the `-parse-as-library` compiler flag (set in Package.swift) for ArgumentParser `@main`.
 
 ### Key Architectural Decisions
 

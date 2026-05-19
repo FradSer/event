@@ -14,7 +14,7 @@ A pure Swift CLI tool for managing Apple Reminders and Calendar on macOS.
 - **Subtasks**: Add and manage subtasks within reminders
 - **Tags**: Tag reminders for organization
 - **Multiple Formats**: Markdown (default) and JSON output
-- **Cloud Sync**: Sync data with Cloudflare D1 via the `event-sync` command
+- **Cloud Sync**: Sync data with Cloudflare D1 via `event sync`
 
 ## Requirements
 

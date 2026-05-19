@@ -6,7 +6,6 @@ let package = Package(
   platforms: [.macOS(.v14)],
   products: [
     .executable(name: "event", targets: ["event"]),
-    .executable(name: "event-sync", targets: ["event-sync"]),
     .library(name: "EventModels", targets: ["EventModels"]),
   ],
   dependencies: [
@@ -43,19 +42,6 @@ let package = Package(
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       path: "Sources/event",
-      swiftSettings: [
-        .unsafeFlags(["-parse-as-library"])
-      ]
-    ),
-    .executableTarget(
-      name: "event-sync",
-      dependencies: [
-        "EventModels",
-        "EventSync",
-        "EventCommands",
-        .product(name: "ArgumentParser", package: "swift-argument-parser"),
-      ],
-      path: "Sources/event-sync",
       swiftSettings: [
         .unsafeFlags(["-parse-as-library"])
       ]

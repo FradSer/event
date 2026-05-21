@@ -132,7 +132,10 @@ event sync status   # 验证配置
 ```
 
 环境变量优先。未设置时，`event` 会回退到 `event sync config --api-url <URL>
---api-token <TOKEN> --device-id <ID>` 写入的配置文件。
+--api-token <TOKEN>` 写入的配置文件（`--device-id` 可选，默认使用主机名）。
+
+> **注意：** 配置文件 `~/.config/event-sync/config.json` 以明文存储 API token
+> （权限 `0600`，仅属主可读）。请勿提交到版本控制或复制到共享存储。
 
 #### 3. 同步
 

@@ -29,6 +29,7 @@ let package = Package(
       name: "EventCommands",
       dependencies: [
         "EventModels",
+        "EventSync",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       path: "Sources/EventCommands"

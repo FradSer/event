@@ -134,8 +134,12 @@ event sync status   # verify the configuration
 ```
 
 Environment variables take precedence. If they are unset, `event` falls back to
-a config file written by `event sync config --api-url <URL> --api-token <TOKEN>
---device-id <ID>`.
+a config file written by `event sync config --api-url <URL> --api-token <TOKEN>`
+(`--device-id` is optional and defaults to the machine hostname).
+
+> **Note:** the config file at `~/.config/event-sync/config.json` stores the API
+> token in plain text (mode `0600`, owner-only). Do not commit it to version
+> control or copy it to shared storage.
 
 #### 3. Sync
 

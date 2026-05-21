@@ -7,6 +7,7 @@ let package = Package(
   products: [
     .executable(name: "event", targets: ["event"]),
     .library(name: "EventModels", targets: ["EventModels"]),
+    .library(name: "EventSync", targets: ["EventSync"]),
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),

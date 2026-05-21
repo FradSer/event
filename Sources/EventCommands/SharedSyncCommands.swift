@@ -1,5 +1,6 @@
 import ArgumentParser
 import EventModels
+import EventSync
 import Foundation
 
 // MARK: - Shared Sync Subcommands
@@ -16,13 +17,14 @@ public struct SyncConfigCommand: AsyncParsableCommand {
   @Option(help: "API Bearer token")
   public var apiToken: String
 
-  @Option(help: "Device identifier (e.g. macbook-frad)")
-  public var deviceId: String
+  @Option(help: "Device identifier (default: system hostname)")
+  public var deviceId: String?
 
   public init() {}
 
   public func run() async throws {
-    let config = SyncConfig(apiURL: apiUrl, apiToken: apiToken, deviceId: deviceId)
+    let resolvedDeviceId = deviceId ?? ProcessInfo.processInfo.hostName
+    let config = SyncConfig(apiURL: apiUrl, apiToken: apiToken, deviceId: resolvedDeviceId)
     try SyncConfigStore.save(config)
     print("Sync config saved to \(SyncConfigStore.configPath)")
   }

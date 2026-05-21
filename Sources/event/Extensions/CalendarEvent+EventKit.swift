@@ -30,7 +30,7 @@ extension CalendarEvent {
       endDate = formatter.string(from: end)
     }
 
-    let utcFormatter = DateFormatter.eventISO8601
+    let utcFormatter = ISO8601DateFormatter.eventISO8601
 
     let status: String
     switch ekEvent.status {

@@ -24,53 +24,20 @@ actor SyncService {
 
   func pushReminders() async throws -> PushResult {
     let reminders = try await reminderService.fetchReminders(showCompleted: true)
-    var idMapping = SyncConfigStore.loadIdMapping()
-    var state = SyncConfigStore.loadState()
-    let localToRemote = invertMapping(idMapping.reminders)
-    let currentRemoteIds = Set(reminders.map { localToRemote[$0.id] ?? $0.id })
-    let deletedRemoteIds = state.reminders.deletionCandidates(currentRemoteIds: currentRemoteIds)
-    let fallbackLastModified = DateFormatter.eventISO8601.string(from: Date())
-    let lastModifiedByRemoteId = try Dictionary(
-      uniqueKeysWithValues: reminders.map { reminder in
-        let remoteId = localToRemote[reminder.id] ?? reminder.id
-        return (
-          remoteId,
-          try state.reminders.lastModified(
-            for: reminder,
-            remoteId: remoteId,
-            fallback: fallbackLastModified
-          )
-        )
-      }
+    return try await pushEntities(
+      items: reminders,
+      getId: { $0.id },
+      getMapping: { $0.reminders },
+      removeMapping: { $0.reminders.removeValue(forKey: $1) },
+      getEntityState: { $0.reminders },
+      setEntityState: { $0.reminders = $1 },
+      deletionCandidates: { $0.deletionCandidates(currentRemoteIds: $1) },
+      push: {
+        try await self.syncClient.pushReminders(
+          $0, idOverrides: $1, lastModifiedByRemoteId: $2)
+      },
+      delete: { try await self.syncClient.deleteReminder(id: $0, lastModified: $1) }
     )
-
-    let result = try await syncClient.pushReminders(
-      reminders,
-      idOverrides: localToRemote,
-      lastModifiedByRemoteId: lastModifiedByRemoteId
-    )
-
-    for remoteId in deletedRemoteIds {
-      try await syncClient.deleteReminder(
-        id: remoteId, lastModified: state.reminders.lastModifiedByRemoteId[remoteId])
-      idMapping.reminders.removeValue(forKey: remoteId)
-      state.reminders.removeRemoteId(remoteId)
-    }
-
-    for reminder in reminders {
-      let remoteId = localToRemote[reminder.id] ?? reminder.id
-      if let lastModified = lastModifiedByRemoteId[remoteId] {
-        try state.reminders.recordSyncedValue(
-          reminder,
-          remoteId: remoteId,
-          lastModified: lastModified
-        )
-      }
-    }
-
-    try SyncConfigStore.saveIdMapping(idMapping)
-    try SyncConfigStore.saveState(state)
-    return result
   }
 
   func pushEvents() async throws -> PushResult {
@@ -80,110 +47,105 @@ actor SyncService {
       startDate: window.start,
       endDate: window.end
     )
-    var idMapping = SyncConfigStore.loadIdMapping()
-    var state = SyncConfigStore.loadState()
-    let localToRemote = invertMapping(idMapping.calendarEvents)
-    let currentRemoteIds = Set(events.map { localToRemote[$0.id] ?? $0.id })
     let fetchWindow = SyncDateRange(start: window.start, end: window.end)
-    let deletedRemoteIds = state.calendarEvents.deletionCandidates(
-      currentRemoteIds: currentRemoteIds,
-      withinRange: fetchWindow
+    return try await pushEntities(
+      items: events,
+      getId: { $0.id },
+      getMapping: { $0.calendarEvents },
+      removeMapping: { $0.calendarEvents.removeValue(forKey: $1) },
+      getEntityState: { $0.calendarEvents },
+      setEntityState: { $0.calendarEvents = $1 },
+      deletionCandidates: {
+        $0.deletionCandidates(currentRemoteIds: $1, withinRange: fetchWindow)
+      },
+      push: {
+        try await self.syncClient.pushEvents(
+          $0, idOverrides: $1, lastModifiedByRemoteId: $2)
+      },
+      recordExtra: { entityState, event, remoteId in
+        entityState.recordDateRange(
+          SyncDateRange(start: event.startDate, end: event.endDate), for: remoteId)
+      },
+      delete: { try await self.syncClient.deleteEvent(id: $0, lastModified: $1) }
     )
-    let fallbackLastModified = DateFormatter.eventISO8601.string(from: Date())
-    let lastModifiedByRemoteId = try Dictionary(
-      uniqueKeysWithValues: events.map { event in
-        let remoteId = localToRemote[event.id] ?? event.id
-        return (
-          remoteId,
-          try state.calendarEvents.lastModified(
-            for: event,
-            remoteId: remoteId,
-            fallback: fallbackLastModified
-          )
-        )
-      }
-    )
-
-    let result = try await syncClient.pushEvents(
-      events,
-      idOverrides: localToRemote,
-      lastModifiedByRemoteId: lastModifiedByRemoteId
-    )
-
-    for remoteId in deletedRemoteIds {
-      try await syncClient.deleteEvent(
-        id: remoteId, lastModified: state.calendarEvents.lastModifiedByRemoteId[remoteId])
-      idMapping.calendarEvents.removeValue(forKey: remoteId)
-      state.calendarEvents.removeRemoteId(remoteId)
-    }
-
-    for event in events {
-      let remoteId = localToRemote[event.id] ?? event.id
-      if let lastModified = lastModifiedByRemoteId[remoteId] {
-        try state.calendarEvents.recordSyncedValue(
-          event,
-          remoteId: remoteId,
-          lastModified: lastModified
-        )
-      }
-      state.calendarEvents.recordDateRange(
-        SyncDateRange(start: event.startDate, end: event.endDate),
-        for: remoteId
-      )
-    }
-
-    try SyncConfigStore.saveIdMapping(idMapping)
-    try SyncConfigStore.saveState(state)
-    return result
   }
 
   func pushLists() async throws -> PushResult {
     let lists = try await listService.fetchLists()
+    return try await pushEntities(
+      items: lists,
+      getId: { $0.id },
+      getMapping: { $0.reminderLists },
+      removeMapping: { $0.reminderLists.removeValue(forKey: $1) },
+      getEntityState: { $0.reminderLists },
+      setEntityState: { $0.reminderLists = $1 },
+      deletionCandidates: { $0.deletionCandidates(currentRemoteIds: $1) },
+      push: {
+        try await self.syncClient.pushLists(
+          $0, idOverrides: $1, lastModifiedByRemoteId: $2)
+      },
+      delete: { try await self.syncClient.deleteList(id: $0, lastModified: $1) }
+    )
+  }
+
+  // MARK: - Generic Push
+
+  /// Pushes `items`, records their synced state, then soft-deletes remote IDs no
+  /// longer present locally. State is persisted before any delete RPC fires so a
+  /// deletion failure can never leave pushed items unrecorded. The id-mapping is
+  /// only written when deletions actually mutate it.
+  private func pushEntities<E: Encodable & Sendable>(
+    items: [E],
+    getId: (E) -> String,
+    getMapping: (SyncIdMapping) -> [String: String],
+    removeMapping: (inout SyncIdMapping, String) -> Void,
+    getEntityState: (SyncState) -> SyncEntityState,
+    setEntityState: (inout SyncState, SyncEntityState) -> Void,
+    deletionCandidates: (SyncEntityState, Set<String>) -> [String],
+    push: ([E], [String: String], [String: String]) async throws -> PushResult,
+    recordExtra: ((inout SyncEntityState, E, String) -> Void)? = nil,
+    delete: (String, String?) async throws -> Void
+  ) async throws -> PushResult {
     var idMapping = SyncConfigStore.loadIdMapping()
     var state = SyncConfigStore.loadState()
-    let localToRemote = invertMapping(idMapping.reminderLists)
-    let currentRemoteIds = Set(lists.map { localToRemote[$0.id] ?? $0.id })
-    let deletedRemoteIds = state.reminderLists.deletionCandidates(
-      currentRemoteIds: currentRemoteIds)
-    let fallbackLastModified = DateFormatter.eventISO8601.string(from: Date())
+    var entityState = getEntityState(state)
+    let localToRemote = invertMapping(getMapping(idMapping))
+    // Only items with a known remote mapping count as current; unmapped local
+    // IDs must not be treated as remote IDs to avoid false deletions.
+    let currentRemoteIds = Set(items.compactMap { localToRemote[getId($0)] })
+    let deletedRemoteIds = deletionCandidates(entityState, currentRemoteIds)
+    let fallbackLastModified = ISO8601DateFormatter.eventISO8601.string(from: Date())
     let lastModifiedByRemoteId = try Dictionary(
-      uniqueKeysWithValues: lists.map { list in
-        let remoteId = localToRemote[list.id] ?? list.id
+      uniqueKeysWithValues: items.map { item in
+        let remoteId = localToRemote[getId(item)] ?? getId(item)
         return (
           remoteId,
-          try state.reminderLists.lastModified(
-            for: list,
-            remoteId: remoteId,
-            fallback: fallbackLastModified
-          )
+          try entityState.lastModified(
+            for: item, remoteId: remoteId, fallback: fallbackLastModified)
         )
       }
     )
 
-    let result = try await syncClient.pushLists(
-      lists,
-      idOverrides: localToRemote,
-      lastModifiedByRemoteId: lastModifiedByRemoteId
-    )
+    let result = try await push(items, localToRemote, lastModifiedByRemoteId)
+
+    for item in items {
+      let remoteId = localToRemote[getId(item)] ?? getId(item)
+      if let lastModified = lastModifiedByRemoteId[remoteId] {
+        try entityState.recordSyncedValue(item, remoteId: remoteId, lastModified: lastModified)
+      }
+      recordExtra?(&entityState, item, remoteId)
+    }
+    setEntityState(&state, entityState)
+    try SyncConfigStore.saveState(state)
+
+    guard !deletedRemoteIds.isEmpty else { return result }
 
     for remoteId in deletedRemoteIds {
-      try await syncClient.deleteList(
-        id: remoteId, lastModified: state.reminderLists.lastModifiedByRemoteId[remoteId])
-      idMapping.reminderLists.removeValue(forKey: remoteId)
-      state.reminderLists.removeRemoteId(remoteId)
+      try await delete(remoteId, entityState.lastModifiedByRemoteId[remoteId])
+      removeMapping(&idMapping, remoteId)
+      entityState.removeRemoteId(remoteId)
     }
-
-    for list in lists {
-      let remoteId = localToRemote[list.id] ?? list.id
-      if let lastModified = lastModifiedByRemoteId[remoteId] {
-        try state.reminderLists.recordSyncedValue(
-          list,
-          remoteId: remoteId,
-          lastModified: lastModified
-        )
-      }
-    }
-
+    setEntityState(&state, entityState)
     try SyncConfigStore.saveIdMapping(idMapping)
     try SyncConfigStore.saveState(state)
     return result
@@ -468,9 +430,7 @@ actor SyncService {
   private nonisolated func eventSyncWindow() -> (start: String, end: String) {
     let start = Calendar.current.date(byAdding: .year, value: -1, to: Date()) ?? Date()
     let end = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd"
-    return (formatter.string(from: start), formatter.string(from: end))
+    return (DateFormatter.eventDate.string(from: start), DateFormatter.eventDate.string(from: end))
   }
 
   /// Builds a `localId -> lastModified` index, dropping entries without a timestamp.

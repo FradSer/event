@@ -1,6 +1,7 @@
 import ArgumentParser
 import EventCommands
 import EventModels
+import EventSync
 import Foundation
 
 // MARK: - Sync Entity Type

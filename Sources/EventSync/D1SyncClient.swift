@@ -13,12 +13,6 @@ public actor D1SyncClient {
   private let config: SyncConfig
   private let httpClient: HTTPClient
 
-  private static let iso8601Formatter: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter
-  }()
-
   /// `urlQueryAllowed` minus the separators that must be escaped inside a value.
   private static let queryValueAllowed: CharacterSet = {
     var set = CharacterSet.urlQueryAllowed
@@ -53,7 +47,7 @@ public actor D1SyncClient {
         id: remoteId,
         data: reminder,
         lastModified: lastModifiedByRemoteId[remoteId]
-          ?? Self.iso8601Formatter.string(from: Date())
+          ?? ISO8601DateFormatter.eventISO8601.string(from: Date())
       )
     }
     return try await push(entity: "reminders", items: items)
@@ -76,7 +70,7 @@ public actor D1SyncClient {
         id: remoteId,
         data: event,
         lastModified: lastModifiedByRemoteId[remoteId]
-          ?? Self.iso8601Formatter.string(from: Date())
+          ?? ISO8601DateFormatter.eventISO8601.string(from: Date())
       )
     }
     return try await push(entity: "calendar_events", items: items)
@@ -99,7 +93,7 @@ public actor D1SyncClient {
         id: remoteId,
         data: list,
         lastModified: lastModifiedByRemoteId[remoteId]
-          ?? Self.iso8601Formatter.string(from: Date())
+          ?? ISO8601DateFormatter.eventISO8601.string(from: Date())
       )
     }
     return try await push(entity: "reminder_lists", items: items)
@@ -111,8 +105,10 @@ public actor D1SyncClient {
 
   // MARK: - Pull All (convenience for paginated reads)
 
-  // These read every record regardless of origin device, so the own-writes
+  // These read every live record regardless of origin device, so the own-writes
   // filter is disabled (a Linux-only client expects to see all entities).
+  // Soft-deleted records are dropped -- these convenience reads list current
+  // entities only and do not surface tombstones.
   public func pullAllReminders() async throws -> [Reminder] {
     try await pullAll { cursor in
       try await self.pull(entity: "reminders", cursor: cursor, excludeOwnWrites: false)
@@ -249,7 +245,9 @@ public actor D1SyncClient {
     httpRequest.method = .DELETE
     httpRequest.headers.add(name: "Authorization", value: "Bearer \(config.apiToken)")
     httpRequest.headers.add(name: "Content-Type", value: "application/json")
-    let bodyDict = ["last_modified": lastModified ?? Self.iso8601Formatter.string(from: Date())]
+    let bodyDict = [
+      "last_modified": lastModified ?? ISO8601DateFormatter.eventISO8601.string(from: Date())
+    ]
     httpRequest.body = .bytes(try JSONEncoder().encode(bodyDict))
 
     let response = try await httpClient.execute(httpRequest, timeout: .seconds(30))

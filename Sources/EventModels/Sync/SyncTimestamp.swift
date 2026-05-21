@@ -7,12 +7,6 @@ import Foundation
 /// `yyyy-MM-dd HH:mm:ss` form, so values from EventKit and the D1 backend
 /// can be compared regardless of which side produced them.
 public enum SyncTimestamp {
-  private static let iso8601WithFraction: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter
-  }()
-
   private static let iso8601: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime]
@@ -30,7 +24,7 @@ public enum SyncTimestamp {
   /// Returns the parsed date, or `nil` when the string is empty or unrecognized.
   public static func parse(_ string: String?) -> Date? {
     guard let string, !string.isEmpty else { return nil }
-    return iso8601WithFraction.date(from: string)
+    return ISO8601DateFormatter.eventISO8601.date(from: string)
       ?? iso8601.date(from: string)
       ?? bare.date(from: string)
   }

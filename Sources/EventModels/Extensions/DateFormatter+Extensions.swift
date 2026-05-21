@@ -19,7 +19,12 @@ extension DateFormatter {
     return formatter
   }()
 
-  /// ISO 8601 formatter for sync timestamps
+}
+
+// MARK: - ISO8601DateFormatter Extensions
+
+extension ISO8601DateFormatter {
+  /// ISO 8601 formatter for sync timestamps.
   public static let eventISO8601: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

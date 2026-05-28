@@ -114,9 +114,10 @@ through a Cloudflare Worker backed by D1.
 cd skills/apple-events/references/worker
 pnpm install
 pnpm exec wrangler login
+cp wrangler.example.toml wrangler.toml    # copy the config template
 pnpm exec wrangler d1 create event-sync   # copy the database_id into wrangler.toml
 pnpm run db:migrate:remote                # create the D1 tables
-pnpm exec wrangler secret put API_TOKEN   # set a strong shared token
+openssl rand -hex 32 | pnpm exec wrangler secret put API_TOKEN   # auto-generate and set a strong shared token
 pnpm run deploy                           # prints https://<worker>.workers.dev
 ```
 

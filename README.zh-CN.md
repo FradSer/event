@@ -113,9 +113,10 @@ event reminders lists create --name "工作"
 cd skills/apple-events/references/worker
 pnpm install
 pnpm exec wrangler login
+cp wrangler.example.toml wrangler.toml    # 复制配置文件模板
 pnpm exec wrangler d1 create event-sync   # 把输出的 database_id 填入 wrangler.toml
 pnpm run db:migrate:remote                # 创建 D1 数据表
-pnpm exec wrangler secret put API_TOKEN   # 设置一个强随机的共享 token
+openssl rand -hex 32 | pnpm exec wrangler secret put API_TOKEN   # 自动生成并设置一个强随机 token
 pnpm run deploy                           # 输出 https://<worker>.workers.dev
 ```
 

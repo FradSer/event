@@ -121,12 +121,22 @@ actor SyncService {
     filterDeletionCandidates: (([String], SyncIdMapping) async -> [String])? = nil,
     delete: (String, String?) async throws -> Void
   ) async throws -> PushResult {
+    var seenIds = Set<String>()
+    var uniqueItems = [E]()
+    for item in items {
+      let id = getId(item)
+      if !seenIds.contains(id) {
+        seenIds.insert(id)
+        uniqueItems.append(item)
+      }
+    }
+
     var idMapping = try SyncConfigStore.loadIdMapping()
     var state = try SyncConfigStore.loadState()
     var entityState = getEntityState(state)
     let localToRemote = invertMapping(getMapping(idMapping))
     let currentRemoteIds = SyncPushHelpers.currentRemoteIds(
-      items: items,
+      items: uniqueItems,
       getId: getId,
       localToRemote: localToRemote
     )
@@ -136,7 +146,7 @@ actor SyncService {
     }
     let fallbackLastModified = ISO8601DateFormatter.eventISO8601.string(from: Date())
     let lastModifiedByRemoteId = try Dictionary(
-      uniqueKeysWithValues: items.map { item in
+      uniqueKeysWithValues: uniqueItems.map { item in
         let remoteId = localToRemote[getId(item)] ?? getId(item)
         return (
           remoteId,
@@ -146,9 +156,9 @@ actor SyncService {
       }
     )
 
-    let result = try await push(items, localToRemote, lastModifiedByRemoteId)
+    let result = try await push(uniqueItems, localToRemote, lastModifiedByRemoteId)
 
-    for item in items {
+    for item in uniqueItems {
       let remoteId = localToRemote[getId(item)] ?? getId(item)
       if let lastModified = lastModifiedByRemoteId[remoteId] {
         try entityState.recordSyncedValue(item, remoteId: remoteId, lastModified: lastModified)

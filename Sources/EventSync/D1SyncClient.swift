@@ -191,7 +191,7 @@ public actor D1SyncClient {
     httpRequest.headers.add(name: "Content-Type", value: "application/json")
     httpRequest.body = .bytes(body)
 
-    let response = try await httpClient.execute(httpRequest, timeout: .seconds(30))
+    let response = try await httpClient.execute(httpRequest, timeout: .seconds(120))
     // Push responses are small acknowledgements (1 MB ceiling)
     let responseData = try await response.body.collect(upTo: 1024 * 1024)
 
@@ -224,7 +224,7 @@ public actor D1SyncClient {
     httpRequest.method = .GET
     httpRequest.headers.add(name: "Authorization", value: "Bearer \(config.apiToken)")
 
-    let response = try await httpClient.execute(httpRequest, timeout: .seconds(30))
+    let response = try await httpClient.execute(httpRequest, timeout: .seconds(120))
     // Pull responses carry full entity payloads (10 MB ceiling)
     let responseData = try await response.body.collect(upTo: 10 * 1024 * 1024)
 
@@ -250,7 +250,7 @@ public actor D1SyncClient {
     ]
     httpRequest.body = .bytes(try JSONEncoder().encode(bodyDict))
 
-    let response = try await httpClient.execute(httpRequest, timeout: .seconds(30))
+    let response = try await httpClient.execute(httpRequest, timeout: .seconds(120))
     guard response.status == .ok else {
       let responseData = try await response.body.collect(upTo: 1024 * 1024)
       let errorBody = String(buffer: responseData)

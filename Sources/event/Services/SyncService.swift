@@ -146,14 +146,15 @@ actor SyncService {
     }
     let fallbackLastModified = ISO8601DateFormatter.eventISO8601.string(from: Date())
     let lastModifiedByRemoteId = try Dictionary(
-      uniqueKeysWithValues: uniqueItems.map { item in
+      uniqueItems.map { item in
         let remoteId = localToRemote[getId(item)] ?? getId(item)
         return (
           remoteId,
           try entityState.lastModified(
             for: item, remoteId: remoteId, fallback: fallbackLastModified)
         )
-      }
+      },
+      uniquingKeysWith: { first, _ in first }
     )
 
     let result = try await push(uniqueItems, localToRemote, lastModifiedByRemoteId)

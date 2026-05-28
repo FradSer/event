@@ -1,25 +1,27 @@
-# event ![Swift](https://img.shields.io/badge/Swift-5.9+-F05138) ![macOS](https://img.shields.io/badge/macOS-14.0+-000000)
+# event ![Swift](https://img.shields.io/badge/Swift-5.9+-F05138) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-lightgrey)
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Twitter Follow](https://img.shields.io/twitter/follow/FradSer?style=social)](https://twitter.com/FradSer)
 
 **English** | [简体中文](README.zh-CN.md)
 
-A pure Swift CLI tool for managing Apple Reminders and Calendar on macOS.
+A pure Swift CLI tool for managing Apple Reminders and Calendar. On macOS it reads and writes Apple data directly through EventKit; on Linux it works against a local SQLite store kept in sync with a Cloudflare D1 backend.
 
 ## Features
 
-- **Reminders**: Create, read, update, and delete reminders
-- **Calendar**: Full CRUD operations for calendar events
-- **Lists**: Organize reminders into lists
-- **Subtasks**: Add and manage subtasks within reminders
-- **Tags**: Tag reminders for organization
-- **Multiple Formats**: Markdown (default) and JSON output
-- **Cloud Sync**: Sync data with Cloudflare D1 via `event sync`
+- Create, read, update, and delete reminders
+- Full CRUD for calendar events
+- Organize reminders into lists
+- Add and manage subtasks within reminders
+- Tag reminders for organization
+- Markdown (default) and JSON output
+- Cloud sync across devices with Cloudflare D1 via `event sync`
+- Runs on macOS (EventKit) and Linux (local SQLite + sync)
 
 ## Requirements
 
-- macOS 14.0 or later
 - Swift 5.9 or later
+- **macOS** 14.0 or later — reads and writes Apple Reminders and Calendar directly via EventKit
+- **Linux** — no EventKit, so `event` works against a local SQLite database at `~/.local/share/event-sync/local.db`. Run `event sync` to populate it from Cloudflare D1, then use the same commands on that data
 
 ## Installation
 
@@ -45,7 +47,7 @@ swift build -c release
 cp .build/release/event /usr/local/bin/
 ```
 
-### First Run - Grant Permissions
+### First Run - Grant Permissions (macOS)
 
 On first run, the tool requests access to Reminders and Calendar. If the system permission dialog doesn't appear, manually grant access:
 
@@ -114,7 +116,7 @@ through a Cloudflare Worker backed by D1.
 cd skills/apple-events/references/worker
 pnpm install
 pnpm exec wrangler login
-cp wrangler.example.toml wrangler.toml    # copy the config template
+cp wrangler.toml.example wrangler.toml    # copy the config template
 pnpm exec wrangler d1 create event-sync   # copy the database_id into wrangler.toml
 pnpm run db:migrate:remote                # create the D1 tables
 openssl rand -hex 32 | pnpm exec wrangler secret put API_TOKEN   # auto-generate and set a strong shared token
@@ -149,7 +151,9 @@ event sync   # full bidirectional sync: pull, then push
 ```
 
 Run it on each device. The device id (hostname by default) keeps devices
-distinct, and a device never pulls back its own writes.
+distinct, and a device never pulls back its own writes. On Linux this is the
+first step on a fresh machine — it fills the local SQLite store before the other
+`event` commands have anything to show.
 
 Advanced one-directional / selective sync:
 

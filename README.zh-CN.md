@@ -1,25 +1,27 @@
-# event ![Swift](https://img.shields.io/badge/Swift-5.9+-F05138) ![macOS](https://img.shields.io/badge/macOS-14.0+-000000)
+# event ![Swift](https://img.shields.io/badge/Swift-5.9+-F05138) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-lightgrey)
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Twitter Follow](https://img.shields.io/twitter/follow/FradSer?style=social)](https://twitter.com/FradSer)
 
 [English](README.md) | **简体中文**
 
-一个纯 Swift 编写的 CLI 工具，用于管理 macOS 上的 Apple 提醒事项和日历。
+一个纯 Swift 编写的 CLI 工具，用于管理 Apple 提醒事项和日历。在 macOS 上通过 EventKit 直接读写 Apple 数据；在 Linux 上则基于一个与 Cloudflare D1 后端保持同步的本地 SQLite 存储工作。
 
 ## 功能特性
 
-- **提醒事项**：创建、读取、更新和删除提醒事项
-- **日历**：完整的日历事件 CRUD 操作
-- **列表**：组织和管理提醒事项列表
-- **子任务**：在提醒事项中添加和管理子任务
-- **标签**：为提醒事项添加标签以便组织
-- **多种格式**：Markdown（默认）和 JSON 输出
-- **云同步**：通过 `event sync` 与 Cloudflare D1 同步数据
+- 创建、读取、更新和删除提醒事项
+- 完整的日历事件 CRUD 操作
+- 将提醒事项组织到列表中
+- 在提醒事项中添加和管理子任务
+- 为提醒事项添加标签以便组织
+- Markdown（默认）和 JSON 输出
+- 通过 `event sync` 用 Cloudflare D1 在多设备间云同步
+- 同时支持 macOS（EventKit）和 Linux（本地 SQLite + 同步）
 
 ## 系统要求
 
-- macOS 14.0 或更高版本
 - Swift 5.9 或更高版本
+- **macOS** 14.0 或更高版本 —— 通过 EventKit 直接读写 Apple 提醒事项和日历
+- **Linux** —— 没有 EventKit，因此 `event` 基于位于 `~/.local/share/event-sync/local.db` 的本地 SQLite 数据库工作。先运行 `event sync` 从 Cloudflare D1 填充数据，之后用相同的命令操作这些数据
 
 ## 安装方法
 
@@ -45,7 +47,7 @@ swift build -c release
 cp .build/release/event /usr/local/bin/
 ```
 
-### 首次运行 - 授予权限
+### 首次运行 - 授予权限（macOS）
 
 首次运行时，工具会请求访问提醒事项和日历的权限。如果系统权限对话框没有弹出，你可以手动授予权限：
 
@@ -113,7 +115,7 @@ event reminders lists create --name "工作"
 cd skills/apple-events/references/worker
 pnpm install
 pnpm exec wrangler login
-cp wrangler.example.toml wrangler.toml    # 复制配置文件模板
+cp wrangler.toml.example wrangler.toml    # 复制配置文件模板
 pnpm exec wrangler d1 create event-sync   # 把输出的 database_id 填入 wrangler.toml
 pnpm run db:migrate:remote                # 创建 D1 数据表
 openssl rand -hex 32 | pnpm exec wrangler secret put API_TOKEN   # 自动生成并设置一个强随机 token
@@ -144,7 +146,7 @@ event sync status   # 验证配置
 event sync   # 完整双向同步：先拉取，再推送
 ```
 
-在每台设备上运行即可。device id（默认用主机名）区分各设备，设备不会把自己刚推送的数据又拉回来。
+在每台设备上运行即可。device id（默认用主机名）区分各设备，设备不会把自己刚推送的数据又拉回来。在 Linux 上，这是新机器上的第一步 —— 它会先填充本地 SQLite 存储，之后其他 `event` 命令才有数据可显示。
 
 高级用法 —— 单向 / 按类型同步：
 

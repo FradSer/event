@@ -26,6 +26,12 @@ openssl rand -hex 32 | pnpm exec wrangler secret put API_TOKEN   # auto-generate
 pnpm run deploy                           # prints https://<worker>.workers.dev
 ```
 
+Upgrading an existing deployment: the pull cursor is keyed on a monotonic `seq`
+column added by migration `0002_seq_cursor`. After pulling new changes, re-run
+`pnpm run db:migrate:remote` then `pnpm run deploy`. Devices still holding an
+older timestamp cursor self-heal on their next pull (they restart once and
+re-converge), so no client action is needed.
+
 ## 2. Configure each device
 
 Set two environment variables — add them to `~/.zshrc` (or `~/.bashrc`) so they
@@ -57,6 +63,9 @@ the other `event` commands.
 - Calendar sync covers events from one year in the past to two years ahead;
   events outside this window are not pushed or pulled, but are not deleted from
   the cloud while they still exist locally.
+- The pull cursor is keyed on a monotonic per-table `seq` (assigned by the
+  Worker as `MAX(seq)+1` on every write), not on a wall-clock timestamp, so a
+  change can never be stranded by a cursor that sits above it.
 - Conflicts resolve by last-write-wins: a pull never overwrites a local copy
   modified more recently than the server's version. When the local store
   (EventKit on macOS, SQLite on Linux) provides no modification or creation

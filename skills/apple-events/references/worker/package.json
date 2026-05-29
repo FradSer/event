@@ -12,7 +12,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply event-sync --remote"
   },
   "dependencies": {
-    "hono": "^4.6.0"
+    "hono": "^4.12.23"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.16.6",
@@ -22,6 +22,10 @@
     "wrangler": "^4.92.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp", "workerd"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
   }
 }

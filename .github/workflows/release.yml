@@ -66,7 +66,7 @@ jobs:
     steps:
       - name: Update formula
         env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
@@ -77,12 +77,17 @@ jobs:
             SHAS[$platform]=$(sha256sum "event-${platform}.tar.gz" | cut -d' ' -f1)
           done
 
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/FradSer/brew.git" tap
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          git clone git@github.com:FradSer/homebrew-brew.git tap
           cd tap
+          mkdir -p Formula
 
           cat > Formula/event.rb << FORMULA
           class Event < Formula
-            desc "Pure Swift CLI for managing Apple Reminders and Calendar"
+            desc "CLI tool for managing Apple Reminders and Calendar via EventKit"
             homepage "https://github.com/FradSer/event"
             version "${VERSION}"
             license "MIT"

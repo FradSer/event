@@ -19,7 +19,7 @@ jobs:
           - os: macos-latest
             platform: darwin
             arch: arm64
-          - os: macos-13
+          - os: macos-latest
             platform: darwin
             arch: amd64
           - os: ubuntu-24.04
@@ -36,7 +36,11 @@ jobs:
 
       - name: Build (macOS)
         if: matrix.platform == 'darwin'
-        run: swift build -c release
+        run: |
+          ARCH_FLAG=""
+          [ "${{ matrix.arch }}" = "amd64" ] && ARCH_FLAG="--arch x86_64"
+          swift build -c release $ARCH_FLAG
+          echo "BIN_PATH=$(swift build -c release $ARCH_FLAG --show-bin-path)" >> "$GITHUB_ENV"
 
       - name: Build (Linux)
         if: matrix.platform == 'linux'
@@ -46,10 +50,11 @@ jobs:
             -w /app \
             swift:6.0-jammy \
             bash -c "swift build -c release --static-swift-stdlib"
+          echo "BIN_PATH=.build/release" >> "$GITHUB_ENV"
 
       - name: Create archive
         run: |
-          cp .build/release/event ./event
+          cp "$BIN_PATH/event" ./event
           tar -czf event-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz event
           rm event
 

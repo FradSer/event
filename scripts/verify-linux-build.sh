@@ -4,10 +4,10 @@ set -euo pipefail
 # verify-linux-build.sh
 #
 # Docker-based Linux build verification for the event CLI.
-# Uses swift:5.9-jammy to confirm the project compiles and runs on Linux
+# Uses swift:6.0-jammy to confirm the project compiles and runs on Linux
 # without any EventKit dependencies leaking into cross-platform modules.
 
-IMAGE="swift:5.9-jammy"
+IMAGE="swift:6.0-jammy"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # MARK: - Preflight

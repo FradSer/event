@@ -44,7 +44,7 @@ jobs:
           docker run --rm \
             -v "$PWD":/app \
             -w /app \
-            swift:5.9-jammy \
+            swift:6.0-jammy \
             bash -c "swift build -c release --static-swift-stdlib"
 
       - name: Create archive

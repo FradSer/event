@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.1
 import PackageDescription
 
 let package = Package(
@@ -13,13 +13,15 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
     .package(url: "https://github.com/swift-server/async-http-client", from: "1.21.0"),
     .package(url: "https://github.com/apple/swift-crypto", from: "3.0.0"),
-    .package(url: "https://github.com/stephencelis/SQLite.swift", from: "0.15.3"),
+    .package(
+      url: "https://github.com/stephencelis/SQLite.swift", from: "0.15.3",
+      traits: ["SQLiteSwiftCSQLite"]),
   ],
   targets: [
     .target(
       name: "EventModels",
       dependencies: [
-        .product(name: "Crypto", package: "swift-crypto"),
+        .product(name: "Crypto", package: "swift-crypto")
       ],
       path: "Sources/EventModels"
     ),
@@ -69,5 +71,6 @@ let package = Package(
       dependencies: ["event"],
       path: "Tests/eventTests"
     ),
-  ]
+  ],
+  swiftLanguageModes: [.v5]
 )

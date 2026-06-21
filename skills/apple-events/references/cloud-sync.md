@@ -73,6 +73,7 @@ the other `event` commands.
 - Reminder lists carry no modification timestamp; concurrent renames resolve
   by last-write-wins on pull with no conflict warning.
 - Advanced reminder fields (`tags`, `flagged`, subtask relationships) are
-  macOS/Shortcut-only and are not applied during sync pull; only basic fields
-  are synced.
+  macOS/Shortcut-only and are not applied during sync pull. Basic fields plus
+  `url`, `location`, `alarms`, `recurrenceRules`, and calendar `attendees` are
+  part of the sync payload and are restored on pull.
 - A daily cron on the Worker purges records soft-deleted over 30 days ago.

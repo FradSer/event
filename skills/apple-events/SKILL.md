@@ -97,11 +97,16 @@ All commands support the `--json` flag to output results in JSON format, which i
 
 Sync reminders, calendar events, and lists across devices through a Cloudflare D1 backend.
 
-- Run a full bidirectional sync (pull, then push): `event sync`
+- Run a full bidirectional sync (pull, then push): `event sync` (equivalently `event sync run`)
 - Check configuration and sync state: `event sync status`
+- Configure the backend connection: `event sync config --api-url <URL> --api-token <TOKEN> [--device-id <ID>]` (writes `~/.config/event-sync/config.json`; env vars take precedence when set)
 - Advanced one-directional sync: `event sync push` / `event sync pull` (both accept `--type reminders|calendar|lists|all`)
 
 On macOS, sync bridges EventKit and D1. On Linux, sync bridges the local SQLite database and D1 — so on a fresh Linux machine, `event sync` (or `event sync pull`) is the first step before any data is available to the other commands.
+
+**What syncs.** Basic fields plus `url`, `location`, `alarms`, `recurrenceRules`, and calendar `attendees` travel in the sync payload and are restored on pull — so they survive a cross-device sync. Tags, flagged status, and subtask relationships (`parentTitle`) are macOS/Shortcut-only and are **not** part of the sync payload; they must be set locally on each device.
+
+**D1-direct subcommands** bypass local storage and read/write the cloud backend directly: `event sync reminders list` / `event sync reminders create`, and `event sync calendar list`. Use these to inspect or seed the cloud store without touching EventKit or the local SQLite DB.
 
 Sync requires a configured Cloudflare D1 backend: set the `EVENT_SYNC_API_URL` and `EVENT_SYNC_API_TOKEN` environment variables (the device id defaults to the hostname). For one-time Worker deployment and per-device environment setup, see [`references/cloud-sync.md`](references/cloud-sync.md); the Worker source is bundled with this skill at `references/worker/`.
 
@@ -114,4 +119,4 @@ Sync requires a configured Cloudflare D1 backend: set the `EVENT_SYNC_API_URL` a
 - **Calendar sync window**: only events from one year in the past to two years ahead are pushed and pulled. Events moved outside this window remain in the cloud until explicitly deleted locally.
 - **Sync conflicts**: timed entities use last-write-wins using modification timestamps (falling back to creation time). Local copies without any timestamp are not overwritten on pull.
 - **Reminder lists**: no per-list modification timestamp — concurrent renames last-write-wins on pull.
-- **Advanced fields on sync**: `tags`, `flagged`, `url`, and subtask relationships are not restored during sync pull; use local Shortcut-backed commands for those fields.
+- **Advanced fields on sync**: `tags`, `flagged`, and subtask relationships (`parentTitle`) are macOS/Shortcut-only and are not synced; use local Shortcut-backed commands for those fields. In contrast, `url`, `location`, `alarms`, `recurrenceRules`, and calendar `attendees` travel in the sync payload and are restored on pull.

@@ -31,6 +31,8 @@ swift format --in-place --recursive Sources Package.swift
 .build/debug/event sync                  # full bidirectional sync (pull, then push)
 .build/debug/event sync status
 .build/debug/event sync config --api-url <URL> --api-token <TOKEN> --device-id <ID>
+# Sync also requires an encryption key (same value on every device):
+export EVENT_ENCRYPTION_KEY=$(openssl rand -base64 32)   # generate once, persist in shell rc
 .build/debug/event sync push [--type reminders|calendar|lists|all]   # one-directional
 .build/debug/event sync pull [--type reminders|calendar|lists|all]   # one-directional
 
@@ -46,19 +48,22 @@ pnpm run typecheck                        # worker type check
 
 ## Architecture
 
-Pure Swift CLI for managing Apple Reminders and Calendar via EventKit, with Cloudflare D1 cloud sync.
+Pure Swift CLI for managing Apple Reminders and Calendar via EventKit, with end-to-end
+encrypted Cloudflare D1 cloud sync built on the shared `AppleSyncKit` package.
 
 ### Target Structure
 
 | Target | Type | Purpose |
 |--------|------|---------|
 | `EventModels` | Library | Shared domain models, formatters, sync DTOs, utilities |
-| `EventSync` | Library | `D1SyncClient` HTTP client for Cloudflare D1 |
+| `EventSync` | Library | Sync orchestration, encryption (`EventEncryptor`), SQLite/Cloudflare backends |
 | `EventCommands` | Library | Shared command helpers |
 | `event` | Executable | The CLI (reminders, calendar, sync commands) |
 | `skills/apple-events/references/worker/` | TypeScript | Cloudflare Worker API (Hono + D1) |
 
 Dependencies flow inward: Commands -> Services -> EventKit. The `event` executable requires the `-parse-as-library` compiler flag (set in Package.swift) for ArgumentParser `@main`.
+
+**AppleSyncKit**: Sync primitives — `D1SyncClient`, `SyncEngine` (snapshot strategy), `ConfigStore`, `EncryptionService` — live in the sibling local package `../apple-sync-kit` (`AppleSyncKit` product), referenced via `.package(path:)`. Swift tools 6.2, language mode `.v6`.
 
 ### Key Architectural Decisions
 
@@ -82,7 +87,9 @@ Custom `EventCLIError` enum provides structured errors: `permissionDenied`, `not
 
 ### Sync Architecture
 
-`SyncService` orchestrates push/pull/delete between local EventKit and a Cloudflare D1 backend via `D1SyncClient` (AsyncHTTPClient). Pull order: lists -> reminders -> calendar events (dependency order). Bare `event sync` is `SyncCommands.FullSync` (the `defaultSubcommand`): a full sync that pulls then pushes; `push`/`pull` remain as one-directional subcommands.
+`SyncService` (macOS) and `LinuxSyncService` orchestrate push/pull/delete, delegating the algorithm to `AppleSyncKit.SyncEngine` (`pushSnapshot`/`pushLocalOnly`/`pull`) over `D1SyncClient`. Pull order: lists -> reminders -> calendar events (dependency order). Bare `event sync` is `SyncCommands.FullSync` (the `defaultSubcommand`): a full sync that pulls then pushes; `push`/`pull` remain as one-directional subcommands.
+
+**Encryption (mandatory)**: Reminders and calendar events are end-to-end encrypted; lists are not (no sensitive data). `EventEncryptor.fromEnvironment()` builds an AES-GCM encryptor from `EVENT_ENCRYPTION_KEY` (base64-encoded 32-byte key; generate with `openssl rand -base64 32`, identical on every device). On push, sensitive fields (notes, URL, location, alarms, recurrence, attendees) are sealed into an `EncryptedCarrier` (`{p: ciphertext, i: iv}`) stored in the `notes` field; title/list/dates stay plaintext for search. On pull they are decrypted back. Local EventKit/SQLite always holds plaintext; the Worker's `data` column stores the ciphertext blob. Push/pull of reminders/events throws if the key is unset. The same key is required by the `event sync reminders/calendar` direct-D1 commands.
 
 **Config storage**: `SyncConfigStore.load()` reads connection settings from environment variables first (`EVENT_SYNC_API_URL`, `EVENT_SYNC_API_TOKEN`, optional `EVENT_SYNC_DEVICE_ID` which defaults to the hostname), falling back to `~/.config/event-sync/config.json` (written by `event sync config`). Setting exactly one of the two required env vars is an error. Sync state always lives in `~/.config/event-sync/` with an exclusive file lock (`.lock`): `cursors.json`, `id-mapping.json` (local<->remote), `state.json` — all mode `0o600`. API URL must be HTTPS.
 
@@ -100,6 +107,8 @@ Configured via `.swift-format`: 2-space indentation, 100-character line length, 
 ## Critical Constraints
 
 - **macOS 14.0+**: Required for EventKit async APIs (`requestFullAccessToReminders()`, `requestFullAccessToEvents()`)
+- **Encryption key**: `event sync` (and direct-D1 commands) require `EVENT_ENCRYPTION_KEY` (base64 32-byte) for reminders/events; missing key throws on push/pull. Must match across devices.
+- **Swift 6.2 / language mode v6**: full Swift 6 concurrency is enforced; `AppleSyncKit` comes from `../apple-sync-kit` (sibling path dependency).
 - **EventKit Permissions**: First run triggers system permission dialogs. `PermissionService` handles this.
 - **Thread Safety**: All EventKit operations must be in actors due to non-thread-safe `EKEventStore`
 - **Advanced Fields**: Tags, flagged, URL, and subtask relationships require the `AdvancedReminderEdit` Shortcut; without it (or with `--no-shortcuts`) these fields are skipped with a printed note.

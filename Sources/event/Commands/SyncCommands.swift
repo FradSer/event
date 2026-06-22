@@ -1,3 +1,4 @@
+import AppleSyncKit
 import ArgumentParser
 import EventCommands
 import EventModels
@@ -146,7 +147,9 @@ struct SyncCommands: AsyncParsableCommand {
 // MARK: - Sync Sequencing
 
 /// Pushes the requested entity types, returning results keyed by entity.
-func runPush(_ service: any SyncServiceProtocol, type: SyncEntityType) async throws -> [String: PushResult] {
+func runPush(_ service: any SyncServiceProtocol, type: SyncEntityType) async throws -> [String:
+  PushResult]
+{
   var output: [String: PushResult] = [:]
   switch type {
   case .reminders:
@@ -164,7 +167,9 @@ func runPush(_ service: any SyncServiceProtocol, type: SyncEntityType) async thr
 }
 
 /// Pulls the requested entity types in dependency order, returning results keyed by entity.
-func runPull(_ service: any SyncServiceProtocol, type: SyncEntityType) async throws -> [String: PullSummary] {
+func runPull(_ service: any SyncServiceProtocol, type: SyncEntityType) async throws -> [String:
+  PullSummary]
+{
   var output: [String: PullSummary] = [:]
   switch type {
   case .reminders:

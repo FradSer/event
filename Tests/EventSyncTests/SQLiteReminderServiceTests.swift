@@ -1,3 +1,4 @@
+import AppleSyncKit
 import EventModels
 import EventSync
 import SQLite
@@ -14,7 +15,8 @@ final class SQLiteReminderServiceTests: XCTestCase {
     connection = try Connection(.inMemory)
 
     // Run migrations
-    try connection.execute("""
+    try connection.execute(
+      """
       CREATE TABLE reminders (
         id TEXT PRIMARY KEY NOT NULL,
         data TEXT NOT NULL,
@@ -258,8 +260,9 @@ final class SQLiteReminderServiceTests: XCTestCase {
       CreateReminderParams(title: "Test", priority: 0))
 
     // Check database directly
-    let isLocalOnly = try connection.scalar(
-      "SELECT is_local_only FROM reminders WHERE id = ?", reminder.id) as! Int64
+    let isLocalOnly =
+      try connection.scalar(
+        "SELECT is_local_only FROM reminders WHERE id = ?", reminder.id) as! Int64
 
     XCTAssertEqual(isLocalOnly, 1)
   }
@@ -277,8 +280,9 @@ final class SQLiteReminderServiceTests: XCTestCase {
     _ = try await service.updateReminder(id: created.id, params: updateParams)
 
     // Check that flag is set again
-    let isLocalOnly = try connection.scalar(
-      "SELECT is_local_only FROM reminders WHERE id = ?", created.id) as! Int64
+    let isLocalOnly =
+      try connection.scalar(
+        "SELECT is_local_only FROM reminders WHERE id = ?", created.id) as! Int64
 
     XCTAssertEqual(isLocalOnly, 1)
   }

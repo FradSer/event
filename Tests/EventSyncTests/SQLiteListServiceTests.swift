@@ -1,3 +1,4 @@
+import AppleSyncKit
 import EventModels
 import EventSync
 import SQLite
@@ -14,7 +15,8 @@ final class SQLiteListServiceTests: XCTestCase {
     connection = try Connection(.inMemory)
 
     // Run migrations
-    try connection.execute("""
+    try connection.execute(
+      """
       CREATE TABLE reminder_lists (
         id TEXT PRIMARY KEY NOT NULL,
         data TEXT NOT NULL,
@@ -181,8 +183,9 @@ final class SQLiteListServiceTests: XCTestCase {
     let list = try await service.createList(title: "Test", color: nil)
 
     // Check database directly
-    let isLocalOnly = try connection.scalar(
-      "SELECT is_local_only FROM reminder_lists WHERE id = ?", list.id) as! Int64
+    let isLocalOnly =
+      try connection.scalar(
+        "SELECT is_local_only FROM reminder_lists WHERE id = ?", list.id) as! Int64
 
     XCTAssertEqual(isLocalOnly, 1)
   }
@@ -198,8 +201,9 @@ final class SQLiteListServiceTests: XCTestCase {
     _ = try await service.updateList(id: created.id, title: "Updated", color: nil)
 
     // Check that flag is set again
-    let isLocalOnly = try connection.scalar(
-      "SELECT is_local_only FROM reminder_lists WHERE id = ?", created.id) as! Int64
+    let isLocalOnly =
+      try connection.scalar(
+        "SELECT is_local_only FROM reminder_lists WHERE id = ?", created.id) as! Int64
 
     XCTAssertEqual(isLocalOnly, 1)
   }
@@ -215,10 +219,12 @@ final class SQLiteListServiceTests: XCTestCase {
     try await service.deleteList(id: created.id)
 
     // Check that both deleted and is_local_only flags are set
-    let deleted = try connection.scalar(
-      "SELECT deleted FROM reminder_lists WHERE id = ?", created.id) as! Int64
-    let isLocalOnly = try connection.scalar(
-      "SELECT is_local_only FROM reminder_lists WHERE id = ?", created.id) as! Int64
+    let deleted =
+      try connection.scalar(
+        "SELECT deleted FROM reminder_lists WHERE id = ?", created.id) as! Int64
+    let isLocalOnly =
+      try connection.scalar(
+        "SELECT is_local_only FROM reminder_lists WHERE id = ?", created.id) as! Int64
 
     XCTAssertEqual(deleted, 1)
     XCTAssertEqual(isLocalOnly, 1)

@@ -1,3 +1,4 @@
+import AppleSyncKit
 import EventModels
 import EventSync
 import SQLite
@@ -14,7 +15,8 @@ final class SQLiteCalendarServiceTests: XCTestCase {
     connection = try Connection(.inMemory)
 
     // Run migrations
-    try connection.execute("""
+    try connection.execute(
+      """
       CREATE TABLE calendar_events (
         id TEXT PRIMARY KEY NOT NULL,
         data TEXT NOT NULL,
@@ -270,8 +272,9 @@ final class SQLiteCalendarServiceTests: XCTestCase {
       CreateEventParams(title: "Test", startDate: startDate, endDate: endDate))
 
     // Check database directly
-    let isLocalOnly = try connection.scalar(
-      "SELECT is_local_only FROM calendar_events WHERE id = ?", event.id) as! Int64
+    let isLocalOnly =
+      try connection.scalar(
+        "SELECT is_local_only FROM calendar_events WHERE id = ?", event.id) as! Int64
 
     XCTAssertEqual(isLocalOnly, 1)
   }
@@ -292,8 +295,9 @@ final class SQLiteCalendarServiceTests: XCTestCase {
     _ = try await service.updateEvent(id: created.id, params: updateParams)
 
     // Check that flag is set again
-    let isLocalOnly = try connection.scalar(
-      "SELECT is_local_only FROM calendar_events WHERE id = ?", created.id) as! Int64
+    let isLocalOnly =
+      try connection.scalar(
+        "SELECT is_local_only FROM calendar_events WHERE id = ?", created.id) as! Int64
 
     XCTAssertEqual(isLocalOnly, 1)
   }

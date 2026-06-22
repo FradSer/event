@@ -1,39 +1,39 @@
 #if canImport(EventKit)
-import EventKit
-import EventModels
-import XCTest
+  import EventKit
+  import EventModels
+  import XCTest
 
-@testable import event
+  @testable import event
 
-final class ReminderTests: XCTestCase {
+  final class ReminderTests: XCTestCase {
 
-  private let store = EKEventStore()
+    private let store = EKEventStore()
 
-  func testReminderInitialization() {
-    let ekReminder = EKReminder(eventStore: store)
-    ekReminder.title = "Buy Milk"
-    ekReminder.isCompleted = true
-    ekReminder.notes = "2% fat"
-    ekReminder.priority = 1
+    func testReminderInitialization() {
+      let ekReminder = EKReminder(eventStore: store)
+      ekReminder.title = "Buy Milk"
+      ekReminder.isCompleted = true
+      ekReminder.notes = "2% fat"
+      ekReminder.priority = 1
 
-    let reminder = Reminder(from: ekReminder)
+      let reminder = Reminder(from: ekReminder)
 
-    XCTAssertEqual(reminder.title, "Buy Milk")
-    XCTAssertEqual(reminder.isCompleted, true)
-    XCTAssertEqual(reminder.notes, "2% fat")
-    XCTAssertEqual(reminder.priority, 1)
+      XCTAssertEqual(reminder.title, "Buy Milk")
+      XCTAssertEqual(reminder.isCompleted, true)
+      XCTAssertEqual(reminder.notes, "2% fat")
+      XCTAssertEqual(reminder.priority, 1)
+    }
+
+    func testReminderWithNoNotesAndPriority() {
+      let ekReminder = EKReminder(eventStore: store)
+      ekReminder.title = "Simple Task"
+      ekReminder.priority = 0
+
+      let reminder = Reminder(from: ekReminder)
+
+      XCTAssertEqual(reminder.title, "Simple Task")
+      XCTAssertEqual(reminder.priority, 0)
+      XCTAssertNil(reminder.notes)
+    }
   }
-
-  func testReminderWithNoNotesAndPriority() {
-    let ekReminder = EKReminder(eventStore: store)
-    ekReminder.title = "Simple Task"
-    ekReminder.priority = 0
-
-    let reminder = Reminder(from: ekReminder)
-
-    XCTAssertEqual(reminder.title, "Simple Task")
-    XCTAssertEqual(reminder.priority, 0)
-    XCTAssertNil(reminder.notes)
-  }
-}
 #endif

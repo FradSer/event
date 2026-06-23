@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.0] - 2026-06-23
+
+### Changed
+- Extract the sync infrastructure into the shared AppleSyncKit package (encryption, D1 client, sync engine, SQLite store, config store) and depend on it as a versioned remote package
+- Upgrade the Linux release Docker image to Swift 6.2
+
+### Fixed
+- Decode sync state files that predate the `dateRangeByRemoteId` field (via AppleSyncKit)
+- Percent-encode `/` in record ids on delete so slash-bearing ids resolve the Worker route (via AppleSyncKit)
+
 ## [0.3.0] - 2026-06-02
 
 ### Added

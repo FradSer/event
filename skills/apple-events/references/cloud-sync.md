@@ -32,22 +32,40 @@ column added by migration `0002_seq_cursor`. After pulling new changes, re-run
 older timestamp cursor self-heal on their next pull (they restart once and
 re-converge), so no client action is needed.
 
-## 2. Configure each device
+## 2. Generate the encryption key (one-time)
 
-Set two environment variables — add them to `~/.zshrc` (or `~/.bashrc`) so they
+Reminders and calendar events are end-to-end encrypted before they leave the
+device, so sync **requires** an encryption key. Generate it once and use the
+**same value on every device** (lists are not encrypted and need no key):
+
+```bash
+openssl rand -base64 32   # generate once; copy this exact value to every device
+```
+
+Without a matching `EVENT_ENCRYPTION_KEY`, `event sync push`/`pull` of reminders
+and calendar events fails immediately (the device cannot encrypt outgoing data
+or decrypt what other devices wrote). Lose the key and the encrypted cloud data
+becomes unrecoverable — keep it in a password manager.
+
+## 3. Configure each device
+
+Set three environment variables — add them to `~/.zshrc` (or `~/.bashrc`) so they
 persist across shells:
 
 ```bash
 export EVENT_SYNC_API_URL=https://<your-worker>.workers.dev
 export EVENT_SYNC_API_TOKEN=<the API_TOKEN from step 1>
+export EVENT_ENCRYPTION_KEY=<the base64 key from step 2>   # identical on every device
 # EVENT_SYNC_DEVICE_ID is optional; defaults to the machine hostname
 ```
 
 Verify with `event sync status` — it should report `Config source: environment
-variables`. If the env vars are unset, `event` falls back to a config file
-written by `event sync config --api-url <URL> --api-token <TOKEN> --device-id <ID>`.
+variables`. If the connection env vars are unset, `event` falls back to a config
+file written by `event sync config --api-url <URL> --api-token <TOKEN> --device-id <ID>`;
+`EVENT_ENCRYPTION_KEY` is read from the environment only and is never written to
+that file.
 
-## 3. Sync
+## 4. Sync
 
 ```bash
 event sync   # full bidirectional sync: pull, then push
@@ -60,6 +78,12 @@ the other `event` commands.
 
 ## Notes
 
+- Encryption is mandatory for reminders and calendar events and uses AES-GCM:
+  sensitive fields (notes, URL, location, alarms, recurrence, attendees) are
+  sealed before upload and stored as ciphertext in the cloud; title, list, and
+  dates stay plaintext so search still works. If `event sync` errors with a
+  message about `EVENT_ENCRYPTION_KEY` not being configured, the key is unset or
+  doesn't match — re-export the same base64 value used on your other devices.
 - Calendar sync covers events from one year in the past to two years ahead;
   events outside this window are not pushed or pulled, but are not deleted from
   the cloud while they still exist locally.

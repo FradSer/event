@@ -108,7 +108,7 @@ On macOS, sync bridges EventKit and D1. On Linux, sync bridges the local SQLite 
 
 **D1-direct subcommands** bypass local storage and read/write the cloud backend directly: `event sync reminders list` / `event sync reminders create`, and `event sync calendar list`. Use these to inspect or seed the cloud store without touching EventKit or the local SQLite DB.
 
-Sync requires a configured Cloudflare D1 backend: set the `EVENT_SYNC_API_URL` and `EVENT_SYNC_API_TOKEN` environment variables (the device id defaults to the hostname). For one-time Worker deployment and per-device environment setup, see [`references/cloud-sync.md`](references/cloud-sync.md); the Worker source is bundled with this skill at `references/worker/`.
+Sync requires a configured Cloudflare D1 backend: set the `EVENT_SYNC_API_URL` and `EVENT_SYNC_API_TOKEN` environment variables (the device id defaults to the hostname). Reminders and calendar events are also end-to-end encrypted, so sync requires `EVENT_ENCRYPTION_KEY` — a base64-encoded 32-byte key (`openssl rand -base64 32`) that must be **identical on every device**; reminder/calendar push and pull fail if it is unset or mismatched (lists are not encrypted). For one-time Worker deployment, key generation, and per-device environment setup, see [`references/cloud-sync.md`](references/cloud-sync.md); the Worker source is bundled with this skill at `references/worker/`.
 
 ## Limitations & Notes
 
@@ -120,3 +120,4 @@ Sync requires a configured Cloudflare D1 backend: set the `EVENT_SYNC_API_URL` a
 - **Sync conflicts**: timed entities use last-write-wins using modification timestamps (falling back to creation time). Local copies without any timestamp are not overwritten on pull.
 - **Reminder lists**: no per-list modification timestamp — concurrent renames last-write-wins on pull.
 - **Advanced fields on sync**: `tags`, `flagged`, and subtask relationships (`parentTitle`) are macOS/Shortcut-only and are not synced; use local Shortcut-backed commands for those fields. In contrast, `url`, `location`, `alarms`, `recurrenceRules`, and calendar `attendees` travel in the sync payload and are restored on pull.
+- **Encryption**: reminders and calendar events are end-to-end encrypted with AES-GCM before upload; the cloud only ever stores ciphertext for those fields (title, list, and dates stay plaintext for search). This requires `EVENT_ENCRYPTION_KEY` to be set and identical across devices — see [Cloud Sync](#cloud-sync). Lists carry no sensitive data and are not encrypted.

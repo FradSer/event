@@ -1,6 +1,15 @@
 {
-  "originHash" : "d869b5b6f27c8eb6a31d3c28c74209c57ddb30b3bb51b2e4f676e6b056595175",
+  "originHash" : "66f5dbfe87c188870b3e19261d9d7c6990dbdb3427fb3ef0a3bc797d3b3cc063",
   "pins" : [
+    {
+      "identity" : "apple-sync-kit",
+      "kind" : "remoteSourceControl",
+      "location" : "git@github.com:FradSer/apple-sync-kit.git",
+      "state" : {
+        "revision" : "34c0a2f8d375d488066b744d3d9de4941b87dd48",
+        "version" : "0.1.0"
+      }
+    },
     {
       "identity" : "async-http-client",
       "kind" : "remoteSourceControl",

@@ -43,7 +43,9 @@ echo "Syncing shared docs from: $KIT_DOCS"
 echo "              into skill at: $DEST"
 
 mkdir -p "$DEST"
-rsync -a --delete \
+# -c (checksum) so content-only edits sync even when size and mtime coincide;
+# plain -a compares size+mtime and would silently skip them.
+rsync -ac --delete \
   --exclude 'plans/' \
   --exclude 'retros/' \
   "$KIT_DOCS/" "$DEST/"

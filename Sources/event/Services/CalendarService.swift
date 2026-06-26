@@ -54,7 +54,8 @@
       calendarName: String? = nil,
       location: String? = nil,
       notes: String? = nil,
-      url: String? = nil
+      url: String? = nil,
+      alarmMinutes: [Int]? = nil
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
@@ -85,6 +86,11 @@
         ekEvent.url = validURL
       }
 
+      // Add alarms (minutes before start; negative relative offset)
+      for minutes in alarmMinutes ?? [] {
+        ekEvent.addAlarm(EKAlarm(relativeOffset: -Double(minutes * 60)))
+      }
+
       // Set calendar
       if let calendarName = calendarName {
         let calendars = eventStore.calendars(for: .event).filter { $0.title == calendarName }
@@ -108,7 +114,9 @@
       endDate: String? = nil,
       location: String? = nil,
       notes: String? = nil,
-      url: String? = nil
+      url: String? = nil,
+      alarmMinutes: [Int]? = nil,
+      addAlarmMinutes: [Int]? = nil
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
@@ -144,6 +152,23 @@
 
       if let urlString = url, let validURL = URL(string: urlString) {
         ekEvent.url = validURL
+      }
+
+      // Replace alarms when provided (minutes before start). [] clears all.
+      if let alarmMinutes = alarmMinutes {
+        for existing in ekEvent.alarms ?? [] {
+          ekEvent.removeAlarm(existing)
+        }
+        for minutes in alarmMinutes {
+          ekEvent.addAlarm(EKAlarm(relativeOffset: -Double(minutes * 60)))
+        }
+      }
+
+      // Append alarms without touching existing ones.
+      if let addAlarmMinutes = addAlarmMinutes {
+        for minutes in addAlarmMinutes {
+          ekEvent.addAlarm(EKAlarm(relativeOffset: -Double(minutes * 60)))
+        }
       }
 
       try DateValidator.validateDateRange(start: ekEvent.startDate, end: ekEvent.endDate)

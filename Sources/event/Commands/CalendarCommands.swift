@@ -85,6 +85,12 @@ struct CalendarCommands: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Event notes")
     var notes: String?
 
+    @Option(
+      name: .long,
+      help: "Alert minutes before start (repeatable, e.g. --alarm 15 --alarm 60)"
+    )
+    var alarm: [Int] = []
+
     @Flag(help: "Output in JSON format")
     var json = false
 
@@ -97,7 +103,8 @@ struct CalendarCommands: AsyncParsableCommand {
           endDate: end,
           calendarName: calendar,
           location: location,
-          notes: notes
+          notes: notes,
+          alarmMinutes: alarm.isEmpty ? nil : alarm
         )
       #else
         let backend = try await BackendFactory.makeCalendarBackend()
@@ -148,10 +155,37 @@ struct CalendarCommands: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "New notes")
     var notes: String?
 
+    @Option(
+      name: .long,
+      help: "Replace all alerts with these minutes-before-start (repeatable)"
+    )
+    var alarm: [Int] = []
+
+    @Option(
+      name: .long,
+      help: "Add alerts (minutes before start) to the existing ones (repeatable)"
+    )
+    var addAlarm: [Int] = []
+
+    @Flag(name: .long, help: "Remove all alerts from the event")
+    var clearAlarms = false
+
     @Flag(help: "Output in JSON format")
     var json = false
 
+    func validate() throws {
+      let modes = [!alarm.isEmpty, !addAlarm.isEmpty, clearAlarms].filter { $0 }.count
+      if modes > 1 {
+        throw ValidationError(
+          "Use only one of --alarm, --add-alarm, or --clear-alarms.")
+      }
+    }
+
     func run() async throws {
+      // alarmMinutes: nil = leave unchanged, [] = clear all, [..] = replace.
+      // addAlarmMinutes: nil = none to add, [..] = append to existing.
+      let alarmMinutes: [Int]? = clearAlarms ? [] : (alarm.isEmpty ? nil : alarm)
+      let addAlarmMinutes: [Int]? = addAlarm.isEmpty ? nil : addAlarm
       #if canImport(EventKit)
         let service = CalendarService()
         let event = try await service.updateEvent(
@@ -160,7 +194,9 @@ struct CalendarCommands: AsyncParsableCommand {
           startDate: start,
           endDate: end,
           location: location,
-          notes: notes
+          notes: notes,
+          alarmMinutes: alarmMinutes,
+          addAlarmMinutes: addAlarmMinutes
         )
       #else
         let backend = try await BackendFactory.makeCalendarBackend()

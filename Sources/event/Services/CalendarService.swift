@@ -86,9 +86,15 @@
         ekEvent.url = validURL
       }
 
-      // Add alarms (minutes before start; negative relative offset)
+      // Add alarms (minutes before start; negative relative offset).
+      // Convert to Double before multiplying to avoid Int overflow traps, and
+      // skip duplicate offsets.
+      var addedAlarmOffsets = Set<TimeInterval>()
       for minutes in alarmMinutes ?? [] {
-        ekEvent.addAlarm(EKAlarm(relativeOffset: -Double(minutes * 60)))
+        let offset = -Double(minutes) * 60.0
+        if addedAlarmOffsets.insert(offset).inserted {
+          ekEvent.addAlarm(EKAlarm(relativeOffset: offset))
+        }
       }
 
       // Set calendar
@@ -155,19 +161,30 @@
       }
 
       // Replace alarms when provided (minutes before start). [] clears all.
+      // Convert to Double before multiplying to avoid Int overflow traps, and
+      // skip duplicate offsets.
       if let alarmMinutes = alarmMinutes {
         for existing in ekEvent.alarms ?? [] {
           ekEvent.removeAlarm(existing)
         }
+        var offsets = Set<TimeInterval>()
         for minutes in alarmMinutes {
-          ekEvent.addAlarm(EKAlarm(relativeOffset: -Double(minutes * 60)))
+          let offset = -Double(minutes) * 60.0
+          if offsets.insert(offset).inserted {
+            ekEvent.addAlarm(EKAlarm(relativeOffset: offset))
+          }
         }
       }
 
-      // Append alarms without touching existing ones.
+      // Append alarms without touching existing ones, skipping any offset the
+      // event already has or that repeats within this batch.
       if let addAlarmMinutes = addAlarmMinutes {
+        var offsets = Set((ekEvent.alarms ?? []).map { $0.relativeOffset })
         for minutes in addAlarmMinutes {
-          ekEvent.addAlarm(EKAlarm(relativeOffset: -Double(minutes * 60)))
+          let offset = -Double(minutes) * 60.0
+          if offsets.insert(offset).inserted {
+            ekEvent.addAlarm(EKAlarm(relativeOffset: offset))
+          }
         }
       }
 

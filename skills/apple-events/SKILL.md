@@ -17,6 +17,25 @@ Use the `event` CLI to manage Apple Reminders and Calendars directly from the te
   - Some advanced reminder fields (`tags`, `flagged`, `url`, `parentTitle`) require the `AdvancedReminderEdit` Shortcut to be installed (https://www.icloud.com/shortcuts/b578334075754da9ba6e50b501515808). Without it — or with the global `--no-shortcuts` flag — the basic reminder is still created and those fields are skipped with a printed note.
 - **Linux** (and other non-Apple platforms) — there is no EventKit, so `event` reads and writes a local SQLite database at `~/.local/share/event-sync/local.db`. Run `event sync` first to populate it from the Cloudflare D1 backend (see [Cloud Sync](#cloud-sync)), then use the same commands to manage that local data. Advanced fields and the `AdvancedReminderEdit` Shortcut are macOS-only.
 
+## Claude Desktop (MCP server)
+
+Claude Desktop has no Bash tool, so it cannot call `event` directly. Use the local
+stdio MCP server in `mcp-server/` instead: build it with `pnpm build` inside
+`mcp-server/`, then add it to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+    {
+      "mcpServers": {
+        "event": {
+          "command": "node",
+          "args": ["/absolute/path/to/apple-events-cli/mcp-server/dist/index.js"]
+        }
+      }
+    }
+
+Restart Claude Desktop. It exposes three tools: `reminders_tasks`, `reminders_lists`,
+`calendar_events` — same underlying CLI, same Shortcuts-based tag convention, local-only
+(stdio transport, no network exposure, no OAuth). It does not work from claude.ai Web.
+
 ## General Usage
 
 All commands support the `--json` flag to output results in JSON format, which is easier to parse.

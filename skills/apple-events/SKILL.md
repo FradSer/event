@@ -20,8 +20,10 @@ Use the `event` CLI to manage Apple Reminders and Calendars directly from the te
 ## Claude Desktop (MCP server)
 
 Claude Desktop has no Bash tool, so it cannot call `event` directly. Use the local
-stdio MCP server in `mcp-server/` instead: build it with `pnpm build` inside
-`mcp-server/`, then add it to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+stdio MCP server in `mcp-server/` instead: run `pnpm install` then `pnpm build` inside
+`mcp-server/`, then add it to `~/Library/Application Support/Claude/claude_desktop_config.json`.
+Claude Desktop's launched `node` process may not inherit `/usr/local/bin`, so make sure
+`event` is on its PATH or set the `EVENT_BIN` env var to the binary's full path:
 
     {
       "mcpServers": {

@@ -21,10 +21,26 @@ export const remindersTasksTool: Tool = {
       clearStart: { type: "boolean", description: "Remove the start date (update only)." },
       priority: { type: "integer", enum: [0, 1, 5, 9], description: "0=none, 1=high, 5=medium, 9=low." },
       notes: { type: "string", description: "Reminder notes." },
-      url: { type: "string", description: "URL to associate with the reminder." },
-      tags: { type: "string", description: "Comma-separated tags." },
-      parentTitle: { type: "string", description: "Parent reminder title, to create/convert to a subtask." },
-      flagged: { type: "boolean", description: "Mark as flagged." },
+      url: {
+        type: "string",
+        description:
+          "URL to associate with the reminder. Requires the AdvancedReminderEdit Shortcut; silently skipped without it.",
+      },
+      tags: {
+        type: "string",
+        description:
+          "Comma-separated tags. Requires the AdvancedReminderEdit Shortcut; silently skipped without it.",
+      },
+      parentTitle: {
+        type: "string",
+        description:
+          "Parent reminder title, to create/convert to a subtask. Requires the AdvancedReminderEdit Shortcut; silently skipped without it.",
+      },
+      flagged: {
+        type: "boolean",
+        description:
+          "Mark as flagged. Requires the AdvancedReminderEdit Shortcut; silently skipped without it.",
+      },
       location: { type: "string", description: "Location trigger name, e.g. 'Home'." },
       latitude: { type: "number", description: "Location trigger latitude." },
       longitude: { type: "number", description: "Location trigger longitude." },

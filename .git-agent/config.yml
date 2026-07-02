@@ -11,3 +11,5 @@ scopes:
       description: External integration skills and worker implementation in skills/; does not cover main application logic
     - name: fmt
       description: Homebrew formula definitions for package distribution in Formula/; does not cover source code or tests
+    - name: mcp
+      description: Local stdio MCP server wrapping the event CLI for Claude Desktop, in mcp-server/; does not cover the CLI itself or the Cloudflare sync worker

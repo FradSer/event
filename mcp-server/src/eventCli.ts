@@ -21,7 +21,9 @@ export function eventBinPath(): string {
 
 async function execEventCli(args: string[]): Promise<string> {
   try {
-    const { stdout } = await execFileAsync(eventBinPath(), args);
+    const { stdout } = await execFileAsync(eventBinPath(), args, {
+      maxBuffer: 10 * 1024 * 1024,
+    });
     return stdout.trim();
   } catch (error) {
     const execError = error as { code?: number | null; stderr?: string; message: string };
@@ -38,7 +40,14 @@ export async function runEventCli(args: string[]): Promise<unknown> {
   if (output.length === 0) {
     return null;
   }
-  return JSON.parse(output);
+  // The event CLI may print a "Note: ..." warning (e.g. missing AdvancedReminderEdit
+  // Shortcut) to stdout before its JSON payload. Skip any such preamble and parse
+  // starting at the first JSON token.
+  const jsonStart = output.search(/[[{]/);
+  if (jsonStart === -1) {
+    throw new EventCliError(`event CLI produced no JSON output: ${output}`, "", null);
+  }
+  return JSON.parse(output.slice(jsonStart));
 }
 
 export async function runEventCliText(args: string[]): Promise<string> {

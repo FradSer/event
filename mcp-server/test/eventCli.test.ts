@@ -32,6 +32,12 @@ describe("runEventCli", () => {
       runEventCli(["reminders", "update", "--id", "missing"]),
     ).rejects.toThrow(EventCliError);
   });
+
+  it("parses JSON even when preceded by CLI 'Note:' warning lines", async () => {
+    process.env.EVENT_BIN = path.join(FIXTURES_DIR, "fake-event-note-then-json.mjs");
+    const result = await runEventCli(["reminders", "create", "--title", "Test"]);
+    expect(result).toEqual({ id: "abc-123", title: "Created despite missing shortcut" });
+  });
 });
 
 describe("runEventCliText", () => {

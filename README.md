@@ -47,6 +47,20 @@ swift build -c release
 cp .build/release/event /usr/local/bin/
 ```
 
+### This Fork: One-Command Setup (CLI + Claude Desktop MCP server)
+
+`./install.sh` builds the `event` CLI, builds `mcp-server/` (the local stdio MCP
+server that lets Claude Desktop use `event` without a Bash tool), and registers
+it in Claude Desktop's `mcpServers` config — merging in, not overwriting, any
+other servers already configured there. Safe to re-run on the same machine or
+a new one (e.g. a second Mac).
+
+```bash
+git clone git@github.com:mvroeder/apple-events-cli.git
+cd apple-events-cli
+./install.sh
+```
+
 ### First Run - Grant Permissions (macOS)
 
 On first run, the tool requests access to Reminders and Calendar. If the system permission dialog doesn't appear, manually grant access:

@@ -130,3 +130,13 @@ swift test
 swift test --filter eventTests        # single test target
 swift test --filter AlarmTests        # single test suite
 ```
+
+## Session Memory
+
+Claude's own working notes on this repo (build observations, open decisions, resume points
+for follow-up sessions) live in its auto-memory system, keyed to this project's working
+directory. If picking this repo back up cold, check that memory for a `RESUME HERE` section
+before re-deriving context from git history alone — it tracks things like pending pushes,
+open architectural decisions (e.g. the dpa-pipeline-vs-`event`-CLI overlap in
+`docs/dpa-overlap.md`), and gotchas around this repo's worktree setup that aren't visible
+from the code alone.

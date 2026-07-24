@@ -10,7 +10,7 @@
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
 
 # Thumbnails
 ._*
@@ -267,7 +267,8 @@ iOSInjectionProject/
 bin/EventKitCLI
 
 # Claude configuration
-.claude/
+.claude/*
+!.claude/baton.json
 
 # Test scripts
 test.swift

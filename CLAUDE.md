@@ -140,3 +140,13 @@ before re-deriving context from git history alone — it tracks things like pend
 open architectural decisions (e.g. the dpa-pipeline-vs-`event`-CLI overlap in
 `docs/dpa-overlap.md`), and gotchas around this repo's worktree setup that aren't visible
 from the code alone.
+
+## Project handover (baton)
+
+The authoritative handover note (baton) with goal, architecture decisions, next
+steps and log lives in the `obsidian-personal` vault at
+`Michaels Personal Projects/apple-events-cli/_apple-events-cli (Overview).md`;
+`.claude/baton.json` in this repo points at it. It is injected automatically at
+session start and written forward by `/finish` (preserve-first). Read it at
+session start; do not hand-edit the `## Log` order or move it away from the
+end of the note, the machine relies on it being last.

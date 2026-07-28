@@ -93,7 +93,15 @@ event calendar list --start "2026-03-01" --end "2026-03-31"
 
 # Create an event
 event calendar create --title "Meeting" --start "2026-03-10 14:00:00" --end "2026-03-10 15:00:00"
+
+# Create a timed event in an explicit IANA timezone
+event calendar create --title "New York meeting" --start "2026-03-10 14:00:00" --end "2026-03-10 15:00:00" --timezone America/New_York
+
+# On macOS, change a timed event's timezone without changing its start or end instant
+event calendar update --id EVENT_ID --timezone America/Los_Angeles
 ```
+
+`--timezone` accepts an IANA timezone identifier and applies only to timed events. On macOS, create and update parse timed input in the supplied timezone; updates without a new date preserve the event's start and end instants. On Linux and through sync backends, the identifier is retained as event metadata.
 
 ### Lists
 

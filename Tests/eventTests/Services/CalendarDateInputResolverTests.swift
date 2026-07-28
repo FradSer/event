@@ -14,7 +14,8 @@
         currentStart: start,
         currentEnd: end,
         startInput: "2026-04-10",
-        endInput: "2026-04-11"
+        endInput: "2026-04-11",
+        timeZone: .current
       )
 
       XCTAssertTrue(resolution.isAllDay)
@@ -38,7 +39,8 @@
           currentStart: start,
           currentEnd: end,
           startInput: "2026-04-10",
-          endInput: "2026-04-10 09:30:00"
+          endInput: "2026-04-10 09:30:00",
+          timeZone: .current
         )
       ) { error in
         guard case EventCLIError.invalidInput = error else {
@@ -46,6 +48,32 @@
           return
         }
       }
+    }
+
+    func testResolveParsesTimedInputInProvidedTimeZone() throws {
+      let chicago = try XCTUnwrap(TimeZone(identifier: "America/Chicago"))
+      let newYork = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+      let currentStart = try Date.validated(
+        dateTimeString: "2026-08-21 09:00:00", timeZone: chicago)
+      let currentEnd = try Date.validated(
+        dateTimeString: "2026-08-21 10:00:00", timeZone: chicago)
+
+      let resolution = try CalendarDateInputResolver.resolve(
+        currentIsAllDay: false,
+        currentStart: currentStart,
+        currentEnd: currentEnd,
+        startInput: "2026-08-21 11:00:00",
+        endInput: "2026-08-21 12:00:00",
+        timeZone: newYork
+      )
+
+      let formatter = DateFormatter()
+      formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+      formatter.locale = Locale(identifier: "en_US_POSIX")
+      formatter.timeZone = chicago
+
+      XCTAssertEqual(formatter.string(from: resolution.start), "2026-08-21 10:00:00")
+      XCTAssertEqual(formatter.string(from: resolution.end), "2026-08-21 11:00:00")
     }
   }
 #endif

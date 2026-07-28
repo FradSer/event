@@ -85,6 +85,9 @@ struct CalendarCommands: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Event notes")
     var notes: String?
 
+    @Option(name: .long, help: "IANA timezone for a timed event (for example, America/New_York)")
+    var timezone: String?
+
     @Flag(help: "Output in JSON format")
     var json = false
 
@@ -97,7 +100,8 @@ struct CalendarCommands: AsyncParsableCommand {
           endDate: end,
           calendarName: calendar,
           location: location,
-          notes: notes
+          notes: notes,
+          timeZoneIdentifier: timezone
         )
       #else
         let backend = try await BackendFactory.makeCalendarBackend()
@@ -109,7 +113,8 @@ struct CalendarCommands: AsyncParsableCommand {
           endDate: end,
           isAllDay: isAllDay,
           location: location,
-          notes: notes
+          notes: notes,
+          timeZoneIdentifier: timezone
         )
         let event = try await backend.createEvent(params)
       #endif
@@ -148,6 +153,9 @@ struct CalendarCommands: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "New notes")
     var notes: String?
 
+    @Option(name: .long, help: "IANA timezone for a timed event (for example, America/New_York)")
+    var timezone: String?
+
     @Flag(help: "Output in JSON format")
     var json = false
 
@@ -160,7 +168,8 @@ struct CalendarCommands: AsyncParsableCommand {
           startDate: start,
           endDate: end,
           location: location,
-          notes: notes
+          notes: notes,
+          timeZoneIdentifier: timezone
         )
       #else
         let backend = try await BackendFactory.makeCalendarBackend()
@@ -169,7 +178,8 @@ struct CalendarCommands: AsyncParsableCommand {
           startDate: start,
           endDate: end,
           location: location,
-          notes: notes
+          notes: notes,
+          timeZoneIdentifier: timezone
         )
         let event = try await backend.updateEvent(id: id, params: params)
       #endif

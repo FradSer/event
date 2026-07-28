@@ -25,8 +25,11 @@ extension DateFormatter {
 
 extension Date {
   /// Parse date from string in format "yyyy-MM-dd HH:mm:ss" with validation
-  public static func validated(dateTimeString: String) throws -> Date {
-    return try DateValidator.validateDateTime(dateTimeString)
+  public static func validated(
+    dateTimeString: String,
+    timeZone: TimeZone = .current
+  ) throws -> Date {
+    return try DateValidator.validateDateTime(dateTimeString, timeZone: timeZone)
   }
 
   /// Parse date from string in format "yyyy-MM-dd" with validation

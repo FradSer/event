@@ -54,12 +54,17 @@
       calendarName: String? = nil,
       location: String? = nil,
       notes: String? = nil,
-      url: String? = nil
+      url: String? = nil,
+      timeZoneIdentifier: String? = nil
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
       // Detect if this is an all-day event
       let isAllDay = Date.isAllDayFormat(startDate) && Date.isAllDayFormat(endDate)
+      if isAllDay, timeZoneIdentifier != nil {
+        throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+      }
+      let eventTimeZone = try TimeZoneValidator.resolve(identifier: timeZoneIdentifier)
 
       let start: Date
       let end: Date
@@ -68,8 +73,8 @@
         start = try Date.validated(dateString: startDate)
         end = try Date.validated(dateString: endDate)
       } else {
-        start = try Date.validated(dateTimeString: startDate)
-        end = try Date.validated(dateTimeString: endDate)
+        start = try Date.validated(dateTimeString: startDate, timeZone: eventTimeZone ?? .current)
+        end = try Date.validated(dateTimeString: endDate, timeZone: eventTimeZone ?? .current)
       }
 
       try DateValidator.validateDateRange(start: start, end: end)
@@ -81,6 +86,7 @@
       ekEvent.isAllDay = isAllDay
       ekEvent.location = location
       ekEvent.notes = notes
+      ekEvent.timeZone = eventTimeZone
       if let urlString = url, let validURL = URL(string: urlString) {
         ekEvent.url = validURL
       }
@@ -108,7 +114,8 @@
       endDate: String? = nil,
       location: String? = nil,
       notes: String? = nil,
-      url: String? = nil
+      url: String? = nil,
+      timeZoneIdentifier: String? = nil
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
@@ -116,13 +123,19 @@
         throw EventCLIError.notFound("Event with ID '\(id)' not found")
       }
 
+      let updatedTimeZone = try TimeZoneValidator.resolve(identifier: timeZoneIdentifier)
       let dateResolution = try CalendarDateInputResolver.resolve(
         currentIsAllDay: ekEvent.isAllDay,
         currentStart: ekEvent.startDate ?? Date(),
         currentEnd: ekEvent.endDate ?? Date(),
         startInput: startDate,
-        endInput: endDate
+        endInput: endDate,
+        timeZone: updatedTimeZone ?? ekEvent.timeZone ?? .current
       )
+
+      if dateResolution.isAllDay, timeZoneIdentifier != nil {
+        throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+      }
 
       if let title = title {
         ekEvent.title = title
@@ -132,6 +145,12 @@
         ekEvent.startDate = dateResolution.start
         ekEvent.endDate = dateResolution.end
         ekEvent.isAllDay = dateResolution.isAllDay
+      }
+
+      if dateResolution.isAllDay {
+        ekEvent.timeZone = nil
+      } else if let updatedTimeZone {
+        ekEvent.timeZone = updatedTimeZone
       }
 
       if let location = location {
@@ -202,7 +221,8 @@
         calendarName: params.calendarName,
         location: params.location,
         notes: params.notes,
-        url: params.url
+        url: params.url,
+        timeZoneIdentifier: params.timeZoneIdentifier
       )
     }
 
@@ -214,7 +234,8 @@
         endDate: params.endDate,
         location: params.location,
         notes: params.notes,
-        url: params.url
+        url: params.url,
+        timeZoneIdentifier: params.timeZoneIdentifier
       )
     }
 

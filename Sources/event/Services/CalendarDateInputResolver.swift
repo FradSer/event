@@ -13,7 +13,8 @@ enum CalendarDateInputResolver {
     currentStart: Date,
     currentEnd: Date,
     startInput: String?,
-    endInput: String?
+    endInput: String?,
+    timeZone: TimeZone
   ) throws -> CalendarDateInputResolution {
     let startIsAllDay = startInput.map(Date.isAllDayFormat)
     let endIsAllDay = endInput.map(Date.isAllDayFormat)
@@ -25,8 +26,10 @@ enum CalendarDateInputResolver {
     }
 
     let isAllDay = startIsAllDay ?? endIsAllDay ?? currentIsAllDay
-    let start = try resolveDate(input: startInput, fallback: currentStart, isAllDay: isAllDay)
-    let end = try resolveDate(input: endInput, fallback: currentEnd, isAllDay: isAllDay)
+    let start = try resolveDate(
+      input: startInput, fallback: currentStart, isAllDay: isAllDay, timeZone: timeZone)
+    let end = try resolveDate(
+      input: endInput, fallback: currentEnd, isAllDay: isAllDay, timeZone: timeZone)
 
     try DateValidator.validateDateRange(start: start, end: end)
     return CalendarDateInputResolution(start: start, end: end, isAllDay: isAllDay)
@@ -35,7 +38,8 @@ enum CalendarDateInputResolver {
   private static func resolveDate(
     input: String?,
     fallback: Date,
-    isAllDay: Bool
+    isAllDay: Bool,
+    timeZone: TimeZone
   ) throws -> Date {
     guard let input else {
       return fallback
@@ -43,6 +47,6 @@ enum CalendarDateInputResolver {
     if isAllDay {
       return try Date.validated(dateString: input)
     }
-    return try Date.validated(dateTimeString: input)
+    return try Date.validated(dateTimeString: input, timeZone: timeZone)
   }
 }

@@ -23,6 +23,19 @@ final class DateExtensionsTests: XCTestCase {
     }
   }
 
+  func testValidatedDateTimeUsesSpecifiedTimeZone() throws {
+    let newYork = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+    let chicago = try XCTUnwrap(TimeZone(identifier: "America/Chicago"))
+    let date = try Date.validated(dateTimeString: "2026-08-21 11:00:00", timeZone: newYork)
+
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = chicago
+
+    XCTAssertEqual(formatter.string(from: date), "2026-08-21 10:00:00")
+  }
+
   func testValidatedDate() {
     let dateString = "2026-03-08"
     let date = try? Date.validated(dateString: dateString)

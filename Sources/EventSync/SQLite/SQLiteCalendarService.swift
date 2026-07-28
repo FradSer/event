@@ -51,6 +51,10 @@ public actor SQLiteCalendarService: CalendarBackend {
   // MARK: - Create
 
   public func createEvent(_ params: CreateEventParams) async throws -> CalendarEvent {
+    let timeZone = try TimeZoneValidator.resolve(identifier: params.timeZoneIdentifier)
+    if params.isAllDay, timeZone != nil {
+      throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+    }
     let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
     let id = UUID().uuidString
 
@@ -65,7 +69,7 @@ public actor SQLiteCalendarService: CalendarBackend {
       location: params.location,
       notes: params.notes,
       url: params.url,
-      timeZone: TimeZone.current.identifier,
+      timeZone: timeZone?.identifier ?? (params.isAllDay ? nil : TimeZone.current.identifier),
       creationDate: now,
       lastModifiedDate: now,
       status: nil,
@@ -95,6 +99,11 @@ public actor SQLiteCalendarService: CalendarBackend {
     params: UpdateEventParams
   ) async throws -> CalendarEvent {
     let existing = try await fetchEvent(byId: id)
+    let timeZone = try TimeZoneValidator.resolve(identifier: params.timeZoneIdentifier)
+    let isAllDay = params.isAllDay ?? existing.isAllDay
+    if isAllDay, timeZone != nil {
+      throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+    }
     let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
 
     let updatedEvent = CalendarEvent(
@@ -103,11 +112,11 @@ public actor SQLiteCalendarService: CalendarBackend {
       calendar: existing.calendar,
       startDate: params.startDate ?? existing.startDate,
       endDate: params.endDate ?? existing.endDate,
-      isAllDay: params.isAllDay ?? existing.isAllDay,
+      isAllDay: isAllDay,
       location: params.location ?? existing.location,
       notes: params.notes ?? existing.notes,
       url: params.url ?? existing.url,
-      timeZone: existing.timeZone,
+      timeZone: isAllDay ? nil : timeZone?.identifier ?? existing.timeZone,
       creationDate: existing.creationDate,
       lastModifiedDate: now,
       status: existing.status,

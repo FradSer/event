@@ -84,6 +84,51 @@ final class SQLiteCalendarServiceTests: XCTestCase {
     XCTAssertTrue(event.isAllDay)
   }
 
+  func testCreateAndUpdateEventTimeZone() async throws {
+    let startDate = ISO8601DateFormatter().string(from: Date())
+    let endDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(3600))
+
+    let created = try await service.createEvent(
+      CreateEventParams(
+        title: "Time zone event",
+        startDate: startDate,
+        endDate: endDate,
+        timeZoneIdentifier: "America/New_York"
+      ))
+    XCTAssertEqual(created.timeZone, "America/New_York")
+
+    let updated = try await service.updateEvent(
+      id: created.id,
+      params: UpdateEventParams(timeZoneIdentifier: "America/Los_Angeles")
+    )
+    XCTAssertEqual(updated.timeZone, "America/Los_Angeles")
+    XCTAssertEqual(updated.startDate, startDate)
+    XCTAssertEqual(updated.endDate, endDate)
+  }
+
+  func testCreateAllDayEventRejectsTimeZone() async throws {
+    let startDate = ISO8601DateFormatter().string(from: Date())
+    let endDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(86400))
+
+    do {
+      _ = try await service.createEvent(
+        CreateEventParams(
+          title: "All day event",
+          startDate: startDate,
+          endDate: endDate,
+          isAllDay: true,
+          timeZoneIdentifier: "America/New_York"
+        ))
+      XCTFail("Expected an all-day timezone validation error")
+    } catch let error as EventCLIError {
+      guard case .invalidInput(let message) = error else {
+        XCTFail("Expected invalidInput error, got: \(error)")
+        return
+      }
+      XCTAssertEqual(message, "--timezone is only supported for timed events")
+    }
+  }
+
   // MARK: - Fetch Tests
 
   func testFetchEventsEmpty() async throws {

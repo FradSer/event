@@ -4,10 +4,13 @@ import Foundation
 public enum DateValidator {
   /// Validates datetime string in format "yyyy-MM-dd HH:mm:ss"
   /// Rejects auto-corrected dates (e.g., Feb 30 -> Mar 2)
-  public static func validateDateTime(_ string: String) throws -> Date {
+  public static func validateDateTime(
+    _ string: String,
+    timeZone: TimeZone = .current
+  ) throws -> Date {
     let formatter = DateFormatter()
     formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-    formatter.timeZone = TimeZone.current
+    formatter.timeZone = timeZone
     formatter.locale = Locale(identifier: "en_US_POSIX")
 
     guard let date = formatter.date(from: string) else {
@@ -19,7 +22,8 @@ public enum DateValidator {
     let reformatted = formatter.string(from: date)
     guard reformatted == string else {
       throw EventCLIError.invalidDate(
-        "Invalid date (auto-corrected from \(string) to \(reformatted)). Please provide a valid date."
+        "Invalid date (auto-corrected from \(string) to \(reformatted)). "
+          + "Please provide a valid date."
       )
     }
 
@@ -42,7 +46,8 @@ public enum DateValidator {
     let reformatted = formatter.string(from: date)
     guard reformatted == string else {
       throw EventCLIError.invalidDate(
-        "Invalid date (auto-corrected from \(string) to \(reformatted)). Please provide a valid date."
+        "Invalid date (auto-corrected from \(string) to \(reformatted)). "
+          + "Please provide a valid date."
       )
     }
 

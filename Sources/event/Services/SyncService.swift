@@ -215,7 +215,8 @@
               endDate: item.data.endDate,
               location: item.data.location,
               notes: item.data.notes,
-              url: item.data.url
+              url: item.data.url,
+              timeZoneIdentifier: item.data.timeZone
             )
             return nil
           } catch let error as EventCLIError where error.isNotFound {
@@ -226,7 +227,8 @@
               calendarName: item.data.calendar,
               location: item.data.location,
               notes: item.data.notes,
-              url: item.data.url
+              url: item.data.url,
+              timeZoneIdentifier: item.data.timeZone
             )
             return created.id
           }

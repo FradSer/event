@@ -27,7 +27,7 @@ public enum DateValidator {
       )
     }
 
-    try validateReasonableDate(date)
+    try validateReasonableDate(date, timeZone: timeZone)
     return date
   }
 
@@ -51,7 +51,7 @@ public enum DateValidator {
       )
     }
 
-    try validateReasonableDate(date)
+    try validateReasonableDate(date, timeZone: .current)
     return date
   }
 
@@ -81,9 +81,13 @@ public enum DateValidator {
     }
   }
 
-  /// Validates that date is within reasonable range (1900-2100)
-  public static func validateReasonableDate(_ date: Date) throws {
-    let calendar = Calendar.current
+  /// Validates that date is within the reasonable range (1900-2100) in the given time zone
+  public static func validateReasonableDate(
+    _ date: Date,
+    timeZone: TimeZone = .current
+  ) throws {
+    var calendar = Calendar.current
+    calendar.timeZone = timeZone
     let components = calendar.dateComponents([.year], from: date)
 
     guard let year = components.year else {

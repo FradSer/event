@@ -116,13 +116,24 @@ final class DateValidatorTests: XCTestCase {
   func testValidateReasonableDateTooLate() {
     let formatter = DateFormatter()
     formatter.dateFormat = "yyyy-MM-dd"
-    formatter.timeZone = TimeZone(identifier: "UTC")
+    let timeZone = TimeZone(identifier: "UTC")!
+    formatter.timeZone = timeZone
     let date = formatter.date(from: "2101-01-01")!
-    XCTAssertThrowsError(try DateValidator.validateReasonableDate(date)) { error in
+    XCTAssertThrowsError(
+      try DateValidator.validateReasonableDate(date, timeZone: timeZone)
+    ) { error in
       guard case EventCLIError.dateOutOfRange = error else {
         XCTFail("Expected dateOutOfRange error, got: \(error)")
         return
       }
     }
+  }
+
+  func testValidateReasonableDateUsesProvidedTimeZone() {
+    let date = ISO8601DateFormatter().date(from: "2101-01-01T00:00:00Z")!
+    let timeZone = TimeZone(secondsFromGMT: -12 * 60 * 60)!
+
+    XCTAssertNoThrow(try DateValidator.validateReasonableDate(date, timeZone: timeZone))
+    XCTAssertThrowsError(try DateValidator.validateReasonableDate(date, timeZone: .gmt))
   }
 }

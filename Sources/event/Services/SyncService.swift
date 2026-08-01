@@ -216,7 +216,7 @@
               location: item.data.location,
               notes: item.data.notes,
               url: item.data.url,
-              timeZoneIdentifier: item.data.timeZone
+              timeZoneIdentifier: item.data.isAllDay ? nil : item.data.timeZone
             )
             return nil
           } catch let error as EventCLIError where error.isNotFound {
@@ -228,7 +228,7 @@
               location: item.data.location,
               notes: item.data.notes,
               url: item.data.url,
-              timeZoneIdentifier: item.data.timeZone
+              timeZoneIdentifier: item.data.isAllDay ? nil : item.data.timeZone
             )
             return created.id
           }

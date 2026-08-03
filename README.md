@@ -61,6 +61,8 @@ Alternatively, enable permissions in System Settings:
 - System Settings > Privacy & Security > Reminders > Enable Terminal
 - System Settings > Privacy & Security > Calendars > Enable Terminal
 
+When run headless (SSH, launchd agent/daemon) the prompt cannot be displayed, so `event` returns a permission error immediately. If the prompt is pending but unanswerable (some launchd contexts), the request gives up after 15 s and reports `Permission denied: Timed out waiting for ...`. Tune the wait with `EVENT_PERMISSION_TIMEOUT_MS` (must stay below the MCP server's `EVENTKIT_CLI_TIMEOUT_MS` kill timeout of 30 s so the CLI answers with a readable error first).
+
 ## Usage
 
 ### Reminders

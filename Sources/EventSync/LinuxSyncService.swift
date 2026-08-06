@@ -72,7 +72,7 @@ public actor LinuxSyncService: SyncServiceProtocol {
       getId: { $0.id }, store: SyncConfigStore.store,
       defaultState: SyncState(), stateKeyPath: \.calendarEvents,
       defaultMapping: SyncIdMapping(), mappingKeyPath: \.calendarEvents,
-      volatileKeys: eventSnapshotVolatileKeys,
+      volatileKeys: calendarEventSnapshotVolatileKeys,
       deletionCandidates: { $0.deletionCandidates(currentRemoteIds: $1) },
       push: { items, overrides, lastModified in
         let encrypted = try await encryptor.encryptEvents(items)
@@ -82,7 +82,7 @@ public actor LinuxSyncService: SyncServiceProtocol {
       },
       recordExtra: { entityState, event, remoteId in
         entityState.recordDateRange(
-          SyncDateRange(start: event.startDate, end: event.endDate), for: remoteId)
+          event.syncDateRange(), for: remoteId)
       },
       delete: {
         try await self.syncClient.delete(entity: "calendar_events", id: $0, lastModified: $1)
@@ -161,7 +161,7 @@ public actor LinuxSyncService: SyncServiceProtocol {
       defaultState: SyncState(), stateKeyPath: \.calendarEvents,
       defaultCursors: SyncCursors(), cursorKeyPath: \.calendarEvents,
       defaultMapping: SyncIdMapping(), mappingKeyPath: \.calendarEvents,
-      volatileKeys: eventSnapshotVolatileKeys,
+      volatileKeys: calendarEventSnapshotVolatileKeys,
       localLastModifiedById: localLastModified,
       localIdsWithoutTimestamp: localIds.subtracting(Set(localLastModified.keys)),
       isNotFound: EventSyncRules.isNotFound,
@@ -178,7 +178,7 @@ public actor LinuxSyncService: SyncServiceProtocol {
       },
       recordExtra: { entityState, item in
         entityState.recordDateRange(
-          SyncDateRange(start: item.data.startDate, end: item.data.endDate), for: item.id)
+          item.data.syncDateRange(), for: item.id)
       })
   }
 

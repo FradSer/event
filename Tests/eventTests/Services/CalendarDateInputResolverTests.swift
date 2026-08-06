@@ -75,5 +75,18 @@
       XCTAssertEqual(formatter.string(from: resolution.start), "2026-08-21 10:00:00")
       XCTAssertEqual(formatter.string(from: resolution.end), "2026-08-21 11:00:00")
     }
+
+    func testSyncedFloatingEventClearsExistingTimeZone() throws {
+      let newYork = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+
+      let cleared = CalendarTimeZoneUpdate.resolvedTimeZone(
+        isAllDay: false,
+        clearTimeZone: true,
+        requested: nil,
+        existing: newYork
+      )
+
+      XCTAssertNil(cleared)
+    }
   }
 #endif

@@ -93,7 +93,17 @@ event calendar list --start "2026-03-01" --end "2026-03-31"
 
 # 创建事件
 event calendar create --title "会议" --start "2026-03-10 14:00:00" --end "2026-03-10 15:00:00"
+
+# 在指定 IANA 时区创建定时事件
+event calendar create --title "纽约会议" --start "2026-03-10 14:00:00" --end "2026-03-10 15:00:00" --timezone America/New_York
+
+# 在 macOS 上，不改变开始或结束时刻即可更新定时事件的时区
+event calendar update --id EVENT_ID --timezone America/Los_Angeles
 ```
+
+`--timezone` 接受 IANA 时区标识符，仅适用于定时事件。在 macOS 上，创建和更新会按指定时区解析定时时间；没有新日期的更新会保留事件的开始和结束时刻。在 Linux 和同步后端中，该标识符会作为事件元数据保留。
+
+日历同步 payload 会携带日期格式版本，使新客户端能够区分带事件时区的日期和旧客户端写入的记录。缺少该标记的旧记录会继续按之前的机器本地时间解释，直到由权威 macOS 设备重新序列化；仅凭旧 payload 无法恢复最初写入机器的时区。在多设备间依赖事件时区前，请先从该设备重新同步旧日历记录。
 
 ### 列表
 

@@ -5,14 +5,16 @@
   import Foundation
 
   extension CalendarEvent {
-    init(from ekEvent: EKEvent, preferredTimeZone: TimeZone = .current) {
+    init(from ekEvent: EKEvent, preferredTimeZone: TimeZone? = nil) {
+      let formattingTimeZone =
+        preferredTimeZone ?? (ekEvent.isAllDay ? nil : ekEvent.timeZone) ?? .current
       let startDate: String
       let endDate: String
 
       if ekEvent.isAllDay {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = preferredTimeZone
+        formatter.timeZone = formattingTimeZone
 
         let start = ekEvent.startDate ?? Date()
         let end = ekEvent.endDate ?? start
@@ -23,7 +25,7 @@
       } else {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        formatter.timeZone = preferredTimeZone
+        formatter.timeZone = formattingTimeZone
 
         let start = ekEvent.startDate ?? Date()
         let end = ekEvent.endDate ?? start
@@ -80,7 +82,7 @@
         lastModifiedDate: ekEvent.lastModifiedDate.map { utcFormatter.string(from: $0) },
         status: status,
         availability: availability,
-        alarms: ekEvent.alarms?.map { Alarm(from: $0, preferredTimeZone: preferredTimeZone) },
+        alarms: ekEvent.alarms?.map { Alarm(from: $0, preferredTimeZone: formattingTimeZone) },
         recurrenceRules: ekEvent.recurrenceRules?.map { RecurrenceRule(from: $0) },
         attendees: ekEvent.attendees?.map { Participant(from: $0) }
       )

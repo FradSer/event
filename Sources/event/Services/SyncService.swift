@@ -60,14 +60,16 @@
       let encryptor = try requireEncryptor()
       // Syncs events within `eventSyncWindow()`. Events outside this window are excluded.
       let window = eventSyncWindow()
+      let fetchStart = DateFormatter.eventDate.string(from: window.start)
+      let fetchEnd = DateFormatter.eventDate.string(from: window.end)
       let events = try await calendarService.fetchEvents(
-        startDate: window.start, endDate: window.end)
-      let fetchWindow = SyncDateRange(start: window.start, end: window.end)
+        startDate: fetchStart, endDate: fetchEnd)
+      let fetchWindow = CalendarEvent.syncDateRange(start: fetchStart, end: fetchEnd)
       return try await SyncEngine.pushSnapshot(
         items: events, getId: { $0.id }, store: SyncConfigStore.store,
         defaultState: SyncState(), stateKeyPath: \.calendarEvents,
         defaultMapping: SyncIdMapping(), mappingKeyPath: \.calendarEvents,
-        volatileKeys: eventSnapshotVolatileKeys,
+        volatileKeys: calendarEventSnapshotVolatileKeys,
         deletionCandidates: { entityState, currentRemoteIds in
           entityState.deletionCandidates(
             currentRemoteIds: currentRemoteIds, withinRange: fetchWindow)
@@ -80,7 +82,7 @@
         },
         recordExtra: { entityState, event, remoteId in
           entityState.recordDateRange(
-            SyncDateRange(start: event.startDate, end: event.endDate), for: remoteId)
+            event.syncDateRange(), for: remoteId)
         },
         filterDeletionCandidates: { candidates, idMapping in
           var confirmed: [String] = []
@@ -183,8 +185,10 @@
     func pullEvents() async throws -> PullSummary {
       let encryptor = try requireEncryptor()
       let window = eventSyncWindow()
+      let fetchStart = DateFormatter.eventDate.string(from: window.start)
+      let fetchEnd = DateFormatter.eventDate.string(from: window.end)
       let localEvents = try await calendarService.fetchEvents(
-        startDate: window.start, endDate: window.end)
+        startDate: fetchStart, endDate: fetchEnd)
       let localLastModified = lastModifiedIndex(
         localEvents.map {
           (id: $0.id, lastModified: $0.lastModifiedDate, creationDate: $0.creationDate)
@@ -196,7 +200,7 @@
         defaultState: SyncState(), stateKeyPath: \.calendarEvents,
         defaultCursors: SyncCursors(), cursorKeyPath: \.calendarEvents,
         defaultMapping: SyncIdMapping(), mappingKeyPath: \.calendarEvents,
-        volatileKeys: eventSnapshotVolatileKeys,
+        volatileKeys: calendarEventSnapshotVolatileKeys,
         localLastModifiedById: localLastModified,
         localIdsWithoutTimestamp: localIds.subtracting(Set(localLastModified.keys)),
         isNotFound: EventSyncRules.isNotFound,
@@ -215,7 +219,10 @@
               endDate: item.data.endDate,
               location: item.data.location,
               notes: item.data.notes,
-              url: item.data.url
+              url: item.data.url,
+              timeZoneIdentifier: item.data.syncTimeZoneIdentifier,
+              clearTimeZone: item.data.shouldClearTimeZoneOnSync,
+              dateFormatVersion: item.data.dateFormatVersion
             )
             return nil
           } catch let error as EventCLIError where error.isNotFound {
@@ -226,14 +233,16 @@
               calendarName: item.data.calendar,
               location: item.data.location,
               notes: item.data.notes,
-              url: item.data.url
+              url: item.data.url,
+              timeZoneIdentifier: item.data.syncTimeZoneIdentifier,
+              dateFormatVersion: item.data.dateFormatVersion
             )
             return created.id
           }
         },
         recordExtra: { entityState, item in
           entityState.recordDateRange(
-            SyncDateRange(start: item.data.startDate, end: item.data.endDate), for: item.id)
+            item.data.syncDateRange(), for: item.id)
         })
     }
 
@@ -268,12 +277,12 @@
     // MARK: - Helpers
 
     /// The calendar window synced by push and pull: one year back to two years ahead.
-    private nonisolated func eventSyncWindow() -> (start: String, end: String) {
-      let start = Calendar.current.date(byAdding: .year, value: -1, to: Date()) ?? Date()
-      let end = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
-      return (
-        DateFormatter.eventDate.string(from: start), DateFormatter.eventDate.string(from: end)
-      )
+    private nonisolated func eventSyncWindow() -> (start: Date, end: Date) {
+      let calendar = Calendar.current
+      let today = calendar.startOfDay(for: Date())
+      let start = calendar.date(byAdding: .year, value: -1, to: today) ?? today
+      let end = calendar.date(byAdding: .year, value: 2, to: today) ?? today
+      return (start, end)
     }
 
     /// Builds a `localId -> lastModified` index, preferring modification time and

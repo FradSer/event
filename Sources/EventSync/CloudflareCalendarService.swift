@@ -30,9 +30,8 @@ public actor CloudflareCalendarService: CalendarBackend {
       filtered = filtered.filter { $0.calendar == calendarName }
     }
 
-    filtered = filtered.filter { event in
-      eventOverlapsRange(event: event, rangeStart: start, rangeEnd: end)
-    }
+    let range = CalendarEvent.syncDateRange(start: start, end: end)
+    filtered = filtered.filter { $0.syncDateRange().overlaps(range) }
 
     return try await encryptor.decryptEvents(filtered)
   }
@@ -48,6 +47,10 @@ public actor CloudflareCalendarService: CalendarBackend {
   // MARK: - Create
 
   public func createEvent(_ params: CreateEventParams) async throws -> CalendarEvent {
+    let timeZone = try TimeZoneValidator.resolve(identifier: params.timeZoneIdentifier)
+    if params.isAllDay, timeZone != nil {
+      throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+    }
     let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
     let id = UUID().uuidString
 
@@ -62,7 +65,7 @@ public actor CloudflareCalendarService: CalendarBackend {
       location: params.location,
       notes: params.notes,
       url: params.url,
-      timeZone: TimeZone.current.identifier,
+      timeZone: timeZone?.identifier ?? (params.isAllDay ? nil : TimeZone.current.identifier),
       creationDate: now,
       lastModifiedDate: now,
       status: nil,
@@ -89,19 +92,45 @@ public actor CloudflareCalendarService: CalendarBackend {
     }
 
     let existing = try await encryptor.decryptEvents([encrypted])[0]
+    let timeZone = try TimeZoneValidator.resolve(identifier: params.timeZoneIdentifier)
+    let isAllDay = params.isAllDay ?? existing.isAllDay
+    if isAllDay, timeZone != nil {
+      throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+    }
+    let existingTimeZone =
+      try TimeZoneValidator.resolve(identifier: existing.timeZone) ?? .current
+    let startDate: String
+    if let startDateInput = params.startDate {
+      startDate = startDateInput
+    } else if let timeZone, !isAllDay, existing.usesEventTimeZoneDateFormat {
+      startDate = (try? DateValidator.convertDateTime(
+        existing.startDate, from: existingTimeZone, to: timeZone)) ?? existing.startDate
+    } else {
+      startDate = existing.startDate
+    }
+    let endDate: String
+    if let endDateInput = params.endDate {
+      endDate = endDateInput
+    } else if let timeZone, !isAllDay, existing.usesEventTimeZoneDateFormat {
+      endDate = (try? DateValidator.convertDateTime(
+        existing.endDate, from: existingTimeZone, to: timeZone)) ?? existing.endDate
+    } else {
+      endDate = existing.endDate
+    }
     let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
 
     let updatedPlain = CalendarEvent(
       id: existing.id,
       title: params.title ?? existing.title,
       calendar: existing.calendar,
-      startDate: params.startDate ?? existing.startDate,
-      endDate: params.endDate ?? existing.endDate,
-      isAllDay: params.isAllDay ?? existing.isAllDay,
+      startDate: startDate,
+      endDate: endDate,
+      isAllDay: isAllDay,
       location: params.location ?? existing.location,
       notes: params.notes ?? existing.notes,
       url: params.url ?? existing.url,
-      timeZone: existing.timeZone,
+      timeZone: isAllDay ? nil : timeZone?.identifier ?? existing.timeZone,
+      dateFormatVersion: existing.dateFormatVersion,
       creationDate: existing.creationDate,
       lastModifiedDate: now,
       status: existing.status,
@@ -124,13 +153,4 @@ public actor CloudflareCalendarService: CalendarBackend {
       lastModified: ISO8601DateFormatter.syncISO8601.string(from: Date()))
   }
 
-  // MARK: - Date Range Filtering
-
-  private func eventOverlapsRange(
-    event: CalendarEvent,
-    rangeStart: String,
-    rangeEnd: String
-  ) -> Bool {
-    event.startDate <= rangeEnd && event.endDate >= rangeStart
-  }
 }

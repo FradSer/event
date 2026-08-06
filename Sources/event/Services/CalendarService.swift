@@ -55,22 +55,33 @@
       location: String? = nil,
       notes: String? = nil,
       url: String? = nil,
-      alarmMinutes: [Int]? = nil
+      alarmMinutes: [Int]? = nil,
+      timeZoneIdentifier: String? = nil,
+      dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
       // Detect if this is an all-day event
       let isAllDay = Date.isAllDayFormat(startDate) && Date.isAllDayFormat(endDate)
+      if isAllDay, timeZoneIdentifier != nil {
+        throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+      }
+      let eventTimeZone = try TimeZoneValidator.resolve(identifier: timeZoneIdentifier)
 
       let start: Date
       let end: Date
+
+      let parsingTimeZone =
+        dateFormatVersion == CalendarEvent.currentDateFormatVersion
+        ? eventTimeZone ?? .current
+        : .current
 
       if isAllDay {
         start = try Date.validated(dateString: startDate)
         end = try Date.validated(dateString: endDate)
       } else {
-        start = try Date.validated(dateTimeString: startDate)
-        end = try Date.validated(dateTimeString: endDate)
+        start = try Date.validated(dateTimeString: startDate, timeZone: parsingTimeZone)
+        end = try Date.validated(dateTimeString: endDate, timeZone: parsingTimeZone)
       }
 
       try DateValidator.validateDateRange(start: start, end: end)
@@ -82,6 +93,7 @@
       ekEvent.isAllDay = isAllDay
       ekEvent.location = location
       ekEvent.notes = notes
+      ekEvent.timeZone = eventTimeZone
       if let urlString = url, let validURL = URL(string: urlString) {
         ekEvent.url = validURL
       }
@@ -122,7 +134,10 @@
       notes: String? = nil,
       url: String? = nil,
       alarmMinutes: [Int]? = nil,
-      addAlarmMinutes: [Int]? = nil
+      addAlarmMinutes: [Int]? = nil,
+      timeZoneIdentifier: String? = nil,
+      clearTimeZone: Bool = false,
+      dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
@@ -130,13 +145,29 @@
         throw EventCLIError.notFound("Event with ID '\(id)' not found")
       }
 
+      let updatedTimeZone = try TimeZoneValidator.resolve(identifier: timeZoneIdentifier)
+      let parsingTimeZone: TimeZone
+      if dateFormatVersion == CalendarEvent.currentDateFormatVersion {
+        parsingTimeZone = CalendarTimeZoneUpdate.parsingTimeZone(
+          clearTimeZone: clearTimeZone,
+          requested: updatedTimeZone,
+          existing: ekEvent.timeZone
+        )
+      } else {
+        parsingTimeZone = .current
+      }
       let dateResolution = try CalendarDateInputResolver.resolve(
         currentIsAllDay: ekEvent.isAllDay,
         currentStart: ekEvent.startDate ?? Date(),
         currentEnd: ekEvent.endDate ?? Date(),
         startInput: startDate,
-        endInput: endDate
+        endInput: endDate,
+        timeZone: parsingTimeZone
       )
+
+      if dateResolution.isAllDay, timeZoneIdentifier != nil {
+        throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+      }
 
       if let title = title {
         ekEvent.title = title
@@ -147,6 +178,13 @@
         ekEvent.endDate = dateResolution.end
         ekEvent.isAllDay = dateResolution.isAllDay
       }
+
+      ekEvent.timeZone = CalendarTimeZoneUpdate.resolvedTimeZone(
+        isAllDay: dateResolution.isAllDay,
+        clearTimeZone: clearTimeZone,
+        requested: updatedTimeZone,
+        existing: ekEvent.timeZone
+      )
 
       if let location = location {
         ekEvent.location = location
@@ -244,7 +282,8 @@
         calendarName: params.calendarName,
         location: params.location,
         notes: params.notes,
-        url: params.url
+        url: params.url,
+        timeZoneIdentifier: params.timeZoneIdentifier
       )
     }
 
@@ -256,7 +295,8 @@
         endDate: params.endDate,
         location: params.location,
         notes: params.notes,
-        url: params.url
+        url: params.url,
+        timeZoneIdentifier: params.timeZoneIdentifier
       )
     }
 

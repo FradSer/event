@@ -4,10 +4,13 @@ import Foundation
 public enum DateValidator {
   /// Validates datetime string in format "yyyy-MM-dd HH:mm:ss"
   /// Rejects auto-corrected dates (e.g., Feb 30 -> Mar 2)
-  public static func validateDateTime(_ string: String) throws -> Date {
+  public static func validateDateTime(
+    _ string: String,
+    timeZone: TimeZone = .current
+  ) throws -> Date {
     let formatter = DateFormatter()
     formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-    formatter.timeZone = TimeZone.current
+    formatter.timeZone = timeZone
     formatter.locale = Locale(identifier: "en_US_POSIX")
 
     guard let date = formatter.date(from: string) else {
@@ -19,12 +22,36 @@ public enum DateValidator {
     let reformatted = formatter.string(from: date)
     guard reformatted == string else {
       throw EventCLIError.invalidDate(
-        "Invalid date (auto-corrected from \(string) to \(reformatted)). Please provide a valid date."
+        "Invalid date (auto-corrected from \(string) to \(reformatted)). "
+          + "Please provide a valid date."
       )
     }
 
-    try validateReasonableDate(date)
+    try validateReasonableDate(date, timeZone: timeZone)
     return date
+  }
+
+  /// Reformats a timed date string in another time zone without changing its instant.
+  public static func convertDateTime(
+    _ string: String,
+    from sourceTimeZone: TimeZone,
+    to destinationTimeZone: TimeZone
+  ) throws -> String {
+    let date: Date
+    do {
+      date = try validateDateTime(string, timeZone: sourceTimeZone)
+    } catch {
+      guard let isoDate = ISO8601DateFormatter().date(from: string) else {
+        throw error
+      }
+      try validateReasonableDate(isoDate, timeZone: sourceTimeZone)
+      date = isoDate
+    }
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    formatter.timeZone = destinationTimeZone
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    return formatter.string(from: date)
   }
 
   /// Validates date-only string in format "yyyy-MM-dd"
@@ -42,11 +69,12 @@ public enum DateValidator {
     let reformatted = formatter.string(from: date)
     guard reformatted == string else {
       throw EventCLIError.invalidDate(
-        "Invalid date (auto-corrected from \(string) to \(reformatted)). Please provide a valid date."
+        "Invalid date (auto-corrected from \(string) to \(reformatted)). "
+          + "Please provide a valid date."
       )
     }
 
-    try validateReasonableDate(date)
+    try validateReasonableDate(date, timeZone: .current)
     return date
   }
 
@@ -76,9 +104,13 @@ public enum DateValidator {
     }
   }
 
-  /// Validates that date is within reasonable range (1900-2100)
-  public static func validateReasonableDate(_ date: Date) throws {
-    let calendar = Calendar.current
+  /// Validates that date is within the reasonable range (1900-2100) in the given time zone
+  public static func validateReasonableDate(
+    _ date: Date,
+    timeZone: TimeZone = .current
+  ) throws {
+    var calendar = Calendar.current
+    calendar.timeZone = timeZone
     let components = calendar.dateComponents([.year], from: date)
 
     guard let year = components.year else {

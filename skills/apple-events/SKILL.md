@@ -56,6 +56,7 @@ All commands support the `--json` flag to output results in JSON format, which i
 - Advanced fields (require Shortcut): `event reminders create --title "Urgent bug" --tags "bug,urgent" --flagged true --url "https://github.com/issues/1"`
 - Location trigger: `event reminders create --title "Pick up keys" --location "Home" --latitude 37.3349 --longitude -122.0090 --proximity enter` (`--radius` defaults to 100 meters; `--proximity` is `enter` or `leave`)
 - With a URL: `event reminders create --title "Fix login bug" --url "https://example.com/issues/42"`. When a task is associated with an external link, always pass it via `--url` — never put URLs in `--notes` as a substitute. If the Shortcut isn't installed, `--url` is skipped gracefully with a printed note.
+- Continuing coding/agent work: when a reminder tracks an in-progress coding or agent task tied to a specific project and Claude Code session, append a continuation command to `--notes` on its own line: `Continue:\ncd <project-dir> && claude -r <session-id>` (use `$'...\n...'` for the newline). Resolve `<session-id>` by finding the Claude Code session whose transcript actually holds the task's context — transcripts live at `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`, so grep them by keyword rather than assuming the current session's id. Don't guess `<project-dir>` or `<session-id>`; confirm with `AskUserQuestion` if either is unclear.
 
 ### Update Reminders
 - Mark as completed: `event reminders update --id <UUID> --completed true` (or `--completed false` to uncheck)

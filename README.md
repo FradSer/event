@@ -61,6 +61,8 @@ Alternatively, enable permissions in System Settings:
 - System Settings > Privacy & Security > Reminders > Enable Terminal
 - System Settings > Privacy & Security > Calendars > Enable Terminal
 
+When run headless (SSH, launchd agent/daemon) the prompt cannot be displayed, so `event` returns a permission error immediately. If the prompt is pending but unanswerable (some launchd contexts), the request gives up after 15 s and reports `Permission denied: Timed out waiting for ...`. Tune the wait with `EVENT_PERMISSION_TIMEOUT_MS` (must stay below the MCP server's `EVENTKIT_CLI_TIMEOUT_MS` kill timeout of 30 s so the CLI answers with a readable error first).
+
 ## Usage
 
 ### Reminders
@@ -93,7 +95,17 @@ event calendar list --start "2026-03-01" --end "2026-03-31"
 
 # Create an event
 event calendar create --title "Meeting" --start "2026-03-10 14:00:00" --end "2026-03-10 15:00:00"
+
+# Create a timed event in an explicit IANA timezone
+event calendar create --title "New York meeting" --start "2026-03-10 14:00:00" --end "2026-03-10 15:00:00" --timezone America/New_York
+
+# On macOS, change a timed event's timezone without changing its start or end instant
+event calendar update --id EVENT_ID --timezone America/Los_Angeles
 ```
+
+`--timezone` accepts an IANA timezone identifier and applies only to timed events. On macOS, create and update parse timed input in the supplied timezone; updates without a new date preserve the event's start and end instants. On Linux and through sync backends, the identifier is retained as event metadata.
+
+Calendar sync payloads include a date-format version so newer clients can distinguish timezone-aware dates from records written by older clients. Legacy records without this marker keep their previous machine-local interpretation until they are reserialized by an authoritative macOS device; the original source machine timezone cannot be recovered from the legacy payload alone. Re-sync older calendar records from that device before relying on their per-event timezone across machines.
 
 ### Lists
 

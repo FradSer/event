@@ -31,6 +31,19 @@ final class DateValidatorTests: XCTestCase {
     }
   }
 
+  func testConvertDateTimePreservesInstantAcrossTimeZones() throws {
+    let newYork = TimeZone(identifier: "America/New_York")!
+    let losAngeles = TimeZone(identifier: "America/Los_Angeles")!
+
+    let converted = try DateValidator.convertDateTime(
+      "2026-03-10 14:00:00",
+      from: newYork,
+      to: losAngeles
+    )
+
+    XCTAssertEqual(converted, "2026-03-10 11:00:00")
+  }
+
   // MARK: - validateDate
 
   func testValidateDateValid() {

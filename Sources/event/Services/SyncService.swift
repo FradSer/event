@@ -220,8 +220,9 @@
               location: item.data.location,
               notes: item.data.notes,
               url: item.data.url,
-              timeZoneIdentifier: item.data.isAllDay ? nil : item.data.timeZone,
-              clearTimeZone: !item.data.isAllDay && item.data.timeZone == nil
+              timeZoneIdentifier: item.data.syncTimeZoneIdentifier,
+              clearTimeZone: item.data.shouldClearTimeZoneOnSync,
+              dateFormatVersion: item.data.dateFormatVersion
             )
             return nil
           } catch let error as EventCLIError where error.isNotFound {
@@ -233,7 +234,8 @@
               location: item.data.location,
               notes: item.data.notes,
               url: item.data.url,
-              timeZoneIdentifier: item.data.isAllDay ? nil : item.data.timeZone
+              timeZoneIdentifier: item.data.syncTimeZoneIdentifier,
+              dateFormatVersion: item.data.dateFormatVersion
             )
             return created.id
           }

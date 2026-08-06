@@ -2,6 +2,24 @@ import AppleSyncKit
 import Foundation
 
 extension CalendarEvent {
+  /// Whether timed dates were serialized in the stored event timezone.
+  public var usesEventTimeZoneDateFormat: Bool {
+    !isAllDay && dateFormatVersion == Self.currentDateFormatVersion
+  }
+
+  /// The timezone identifier that can safely be passed to an EventKit parser.
+  /// Legacy records do not carry enough information to recover their source
+  /// machine timezone, so they retain the pre-versioned local-time behavior.
+  public var syncTimeZoneIdentifier: String? {
+    guard usesEventTimeZoneDateFormat else { return nil }
+    return timeZone
+  }
+
+  /// Whether a synced floating event should clear an existing EventKit timezone.
+  public var shouldClearTimeZoneOnSync: Bool {
+    usesEventTimeZoneDateFormat && timeZone == nil
+  }
+
   /// Returns a canonical UTC range for sync comparisons.
   ///
   /// Calendar event date strings are formatted in the event's timezone, so raw
@@ -11,7 +29,7 @@ extension CalendarEvent {
   public func syncDateRange() -> SyncDateRange {
     let fallback = SyncDateRange(start: startDate, end: endDate)
     let eventTimeZone = TimeZone(identifier: timeZone ?? "") ?? .current
-    let parsingTimeZone = isAllDay ? .current : eventTimeZone
+    let parsingTimeZone = usesEventTimeZoneDateFormat ? eventTimeZone : .current
 
     guard let start = Self.parseSyncDate(startDate, timeZone: parsingTimeZone),
       let end = Self.parseSyncDate(endDate, timeZone: parsingTimeZone)

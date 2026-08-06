@@ -103,6 +103,8 @@ event calendar update --id EVENT_ID --timezone America/Los_Angeles
 
 `--timezone` accepts an IANA timezone identifier and applies only to timed events. On macOS, create and update parse timed input in the supplied timezone; updates without a new date preserve the event's start and end instants. On Linux and through sync backends, the identifier is retained as event metadata.
 
+Calendar sync payloads include a date-format version so newer clients can distinguish timezone-aware dates from records written by older clients. Legacy records without this marker keep their previous machine-local interpretation until they are reserialized by an authoritative macOS device; the original source machine timezone cannot be recovered from the legacy payload alone. Re-sync older calendar records from that device before relying on their per-event timezone across machines.
+
 ### Lists
 
 ```bash

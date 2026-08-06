@@ -109,7 +109,7 @@ public actor SQLiteCalendarService: CalendarBackend {
     let startDate: String
     if let startDateInput = params.startDate {
       startDate = startDateInput
-    } else if let timeZone, !isAllDay {
+    } else if let timeZone, !isAllDay, existing.usesEventTimeZoneDateFormat {
       startDate = try DateValidator.convertDateTime(
         existing.startDate, from: existingTimeZone, to: timeZone)
     } else {
@@ -118,7 +118,7 @@ public actor SQLiteCalendarService: CalendarBackend {
     let endDate: String
     if let endDateInput = params.endDate {
       endDate = endDateInput
-    } else if let timeZone, !isAllDay {
+    } else if let timeZone, !isAllDay, existing.usesEventTimeZoneDateFormat {
       endDate = try DateValidator.convertDateTime(
         existing.endDate, from: existingTimeZone, to: timeZone)
     } else {
@@ -137,6 +137,7 @@ public actor SQLiteCalendarService: CalendarBackend {
       notes: params.notes ?? existing.notes,
       url: params.url ?? existing.url,
       timeZone: isAllDay ? nil : timeZone?.identifier ?? existing.timeZone,
+      dateFormatVersion: existing.dateFormatVersion,
       creationDate: existing.creationDate,
       lastModifiedDate: now,
       status: existing.status,

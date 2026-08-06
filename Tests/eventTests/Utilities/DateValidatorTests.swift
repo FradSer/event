@@ -44,6 +44,18 @@ final class DateValidatorTests: XCTestCase {
     XCTAssertEqual(converted, "2026-03-10 11:00:00")
   }
 
+  func testConvertISO8601DateTimePreservesInstant() throws {
+    let losAngeles = TimeZone(identifier: "America/Los_Angeles")!
+
+    let converted = try DateValidator.convertDateTime(
+      "2026-03-10T19:00:00Z",
+      from: .gmt,
+      to: losAngeles
+    )
+
+    XCTAssertEqual(converted, "2026-03-10 12:00:00")
+  }
+
   // MARK: - validateDate
 
   func testValidateDateValid() {

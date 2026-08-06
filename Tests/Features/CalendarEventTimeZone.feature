@@ -28,3 +28,8 @@ Feature: Preserve calendar event timezones during serialization
     Given two calendar events differ only by their timezone identifier
     When their content snapshots are compared
     Then the snapshots are different
+
+  Scenario: Preserve an instant when converting a legacy ISO date string
+    Given a timed event date is "2026-03-10T19:00:00Z"
+    When its timezone changes to "America/Los_Angeles"
+    Then its date is "2026-03-10 12:00:00"

@@ -37,7 +37,16 @@ public enum DateValidator {
     from sourceTimeZone: TimeZone,
     to destinationTimeZone: TimeZone
   ) throws -> String {
-    let date = try validateDateTime(string, timeZone: sourceTimeZone)
+    let date: Date
+    do {
+      date = try validateDateTime(string, timeZone: sourceTimeZone)
+    } catch {
+      guard let isoDate = ISO8601DateFormatter().date(from: string) else {
+        throw error
+      }
+      try validateReasonableDate(isoDate, timeZone: sourceTimeZone)
+      date = isoDate
+    }
     let formatter = DateFormatter()
     formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
     formatter.timeZone = destinationTimeZone

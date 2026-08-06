@@ -66,3 +66,8 @@ public let eventSnapshotVolatileKeys: Set<String> = [
   "alarms", "recurrenceRules", "attendees",
   "externalId", "isFlagged", "locationTrigger",
 ]
+
+/// Calendar events sync their timezone identifier as user-editable content.
+/// Other entities retain the generic set because they do not expose this field.
+public let calendarEventSnapshotVolatileKeys: Set<String> =
+  eventSnapshotVolatileKeys.subtracting(["timeZone"])

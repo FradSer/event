@@ -30,9 +30,8 @@ public actor CloudflareCalendarService: CalendarBackend {
       filtered = filtered.filter { $0.calendar == calendarName }
     }
 
-    filtered = filtered.filter { event in
-      eventOverlapsRange(event: event, rangeStart: start, rangeEnd: end)
-    }
+    let range = CalendarEvent.syncDateRange(start: start, end: end)
+    filtered = filtered.filter { $0.syncDateRange().overlaps(range) }
 
     return try await encryptor.decryptEvents(filtered)
   }
@@ -153,13 +152,4 @@ public actor CloudflareCalendarService: CalendarBackend {
       lastModified: ISO8601DateFormatter.syncISO8601.string(from: Date()))
   }
 
-  // MARK: - Date Range Filtering
-
-  private func eventOverlapsRange(
-    event: CalendarEvent,
-    rangeStart: String,
-    rangeEnd: String
-  ) -> Bool {
-    event.startDate <= rangeEnd && event.endDate >= rangeStart
-  }
 }

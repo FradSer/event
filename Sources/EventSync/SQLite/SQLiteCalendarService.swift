@@ -23,10 +23,8 @@ public actor SQLiteCalendarService: CalendarBackend {
     var sql = """
       SELECT data FROM calendar_events
       WHERE deleted = 0
-        AND json_extract(data, '$.startDate') <= ?
-        AND json_extract(data, '$.endDate') >= ?
       """
-    var bindings: [Binding?] = [end, start]
+    var bindings: [Binding?] = []
 
     if let calendarName {
       sql += " AND json_extract(data, '$.calendar') = ?"
@@ -35,8 +33,10 @@ public actor SQLiteCalendarService: CalendarBackend {
 
     sql += " ORDER BY json_extract(data, '$.startDate') ASC"
 
-    return try connection.prepare(sql, bindings).map { row in
-      try Self.decodeEvent(from: row[0])
+    let range = CalendarEvent.syncDateRange(start: start, end: end)
+    return try connection.prepare(sql, bindings).compactMap { row in
+      let event = try Self.decodeEvent(from: row[0])
+      return event.syncDateRange().overlaps(range) ? event : nil
     }
   }
 

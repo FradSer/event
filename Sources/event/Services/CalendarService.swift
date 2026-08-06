@@ -115,7 +115,8 @@
       location: String? = nil,
       notes: String? = nil,
       url: String? = nil,
-      timeZoneIdentifier: String? = nil
+      timeZoneIdentifier: String? = nil,
+      clearTimeZone: Bool = false
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
@@ -124,13 +125,18 @@
       }
 
       let updatedTimeZone = try TimeZoneValidator.resolve(identifier: timeZoneIdentifier)
+      let parsingTimeZone = CalendarTimeZoneUpdate.parsingTimeZone(
+        clearTimeZone: clearTimeZone,
+        requested: updatedTimeZone,
+        existing: ekEvent.timeZone
+      )
       let dateResolution = try CalendarDateInputResolver.resolve(
         currentIsAllDay: ekEvent.isAllDay,
         currentStart: ekEvent.startDate ?? Date(),
         currentEnd: ekEvent.endDate ?? Date(),
         startInput: startDate,
         endInput: endDate,
-        timeZone: updatedTimeZone ?? ekEvent.timeZone ?? .current
+        timeZone: parsingTimeZone
       )
 
       if dateResolution.isAllDay, timeZoneIdentifier != nil {
@@ -147,11 +153,12 @@
         ekEvent.isAllDay = dateResolution.isAllDay
       }
 
-      if dateResolution.isAllDay {
-        ekEvent.timeZone = nil
-      } else if let updatedTimeZone {
-        ekEvent.timeZone = updatedTimeZone
-      }
+      ekEvent.timeZone = CalendarTimeZoneUpdate.resolvedTimeZone(
+        isAllDay: dateResolution.isAllDay,
+        clearTimeZone: clearTimeZone,
+        requested: updatedTimeZone,
+        existing: ekEvent.timeZone
+      )
 
       if let location = location {
         ekEvent.location = location

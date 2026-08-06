@@ -111,6 +111,10 @@ struct CalendarCommands: AsyncParsableCommand {
           timeZoneIdentifier: timezone
         )
       #else
+        guard alarm.isEmpty else {
+          throw EventCLIError.invalidInput(
+            "The --alarm flag is only supported on the macOS/EventKit backend")
+        }
         let backend = try await BackendFactory.makeCalendarBackend()
         let isAllDay = Date.isAllDayFormat(start) && Date.isAllDayFormat(end)
         let params = CreateEventParams(
@@ -208,6 +212,10 @@ struct CalendarCommands: AsyncParsableCommand {
           timeZoneIdentifier: timezone
         )
       #else
+        guard alarm.isEmpty, addAlarm.isEmpty, !clearAlarms else {
+          throw EventCLIError.invalidInput(
+            "The --alarm/--add-alarm/--clear-alarms flags are only supported on the macOS/EventKit backend")
+        }
         let backend = try await BackendFactory.makeCalendarBackend()
         let params = UpdateEventParams(
           title: title,

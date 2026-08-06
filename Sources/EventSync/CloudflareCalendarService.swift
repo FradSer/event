@@ -98,14 +98,34 @@ public actor CloudflareCalendarService: CalendarBackend {
     if isAllDay, timeZone != nil {
       throw EventCLIError.invalidInput("--timezone is only supported for timed events")
     }
+    let existingTimeZone =
+      try TimeZoneValidator.resolve(identifier: existing.timeZone) ?? .current
+    let startDate: String
+    if let startDateInput = params.startDate {
+      startDate = startDateInput
+    } else if let timeZone, !isAllDay {
+      startDate = try DateValidator.convertDateTime(
+        existing.startDate, from: existingTimeZone, to: timeZone)
+    } else {
+      startDate = existing.startDate
+    }
+    let endDate: String
+    if let endDateInput = params.endDate {
+      endDate = endDateInput
+    } else if let timeZone, !isAllDay {
+      endDate = try DateValidator.convertDateTime(
+        existing.endDate, from: existingTimeZone, to: timeZone)
+    } else {
+      endDate = existing.endDate
+    }
     let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
 
     let updatedPlain = CalendarEvent(
       id: existing.id,
       title: params.title ?? existing.title,
       calendar: existing.calendar,
-      startDate: params.startDate ?? existing.startDate,
-      endDate: params.endDate ?? existing.endDate,
+      startDate: startDate,
+      endDate: endDate,
       isAllDay: isAllDay,
       location: params.location ?? existing.location,
       notes: params.notes ?? existing.notes,

@@ -31,6 +31,20 @@ public enum DateValidator {
     return date
   }
 
+  /// Reformats a timed date string in another time zone without changing its instant.
+  public static func convertDateTime(
+    _ string: String,
+    from sourceTimeZone: TimeZone,
+    to destinationTimeZone: TimeZone
+  ) throws -> String {
+    let date = try validateDateTime(string, timeZone: sourceTimeZone)
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    formatter.timeZone = destinationTimeZone
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    return formatter.string(from: date)
+  }
+
   /// Validates date-only string in format "yyyy-MM-dd"
   /// Used for all-day events
   public static func validateDate(_ string: String) throws -> Date {

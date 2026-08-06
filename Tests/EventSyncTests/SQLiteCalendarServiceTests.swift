@@ -85,8 +85,8 @@ final class SQLiteCalendarServiceTests: XCTestCase {
   }
 
   func testCreateAndUpdateEventTimeZone() async throws {
-    let startDate = ISO8601DateFormatter().string(from: Date())
-    let endDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(3600))
+    let startDate = "2026-03-10 14:00:00"
+    let endDate = "2026-03-10 15:00:00"
 
     let created = try await service.createEvent(
       CreateEventParams(
@@ -102,8 +102,8 @@ final class SQLiteCalendarServiceTests: XCTestCase {
       params: UpdateEventParams(timeZoneIdentifier: "America/Los_Angeles")
     )
     XCTAssertEqual(updated.timeZone, "America/Los_Angeles")
-    XCTAssertEqual(updated.startDate, startDate)
-    XCTAssertEqual(updated.endDate, endDate)
+    XCTAssertEqual(updated.startDate, "2026-03-10 11:00:00")
+    XCTAssertEqual(updated.endDate, "2026-03-10 12:00:00")
   }
 
   func testCreateAllDayEventRejectsTimeZone() async throws {

@@ -6,3 +6,9 @@ Feature: Preserve calendar event timezones during serialization
     When the event is converted to a CalendarEvent without an explicit timezone
     Then its start date is "2026-03-10 15:00:00"
     And its timezone is "America/New_York"
+
+  Scenario: Change a backend event timezone without moving its instant
+    Given a timed event starts at "2026-03-10 14:00:00" in "America/New_York"
+    When its timezone changes to "America/Los_Angeles" without new dates
+    Then its start date is "2026-03-10 11:00:00"
+    And the instant remains unchanged

@@ -33,3 +33,14 @@ Feature: Preserve calendar event timezones during serialization
     Given a timed event date is "2026-03-10T19:00:00Z"
     When its timezone changes to "America/Los_Angeles"
     Then its date is "2026-03-10 12:00:00"
+
+  Scenario: Preserve legacy sync date semantics until an event is reserialized
+    Given a legacy timed event has date "2026-03-10 14:00:00" and timezone "America/New_York"
+    When its sync range is calculated
+    Then the date is interpreted in the machine's current timezone
+    And its sync timezone identifier is omitted
+
+  Scenario: Detect a legacy date format during sync
+    Given two calendar events differ only by their date format version
+    When their content snapshots are compared
+    Then the snapshots are different

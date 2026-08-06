@@ -55,7 +55,8 @@
       location: String? = nil,
       notes: String? = nil,
       url: String? = nil,
-      timeZoneIdentifier: String? = nil
+      timeZoneIdentifier: String? = nil,
+      dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
@@ -69,12 +70,17 @@
       let start: Date
       let end: Date
 
+      let parsingTimeZone =
+        dateFormatVersion == CalendarEvent.currentDateFormatVersion
+        ? eventTimeZone ?? .current
+        : .current
+
       if isAllDay {
         start = try Date.validated(dateString: startDate)
         end = try Date.validated(dateString: endDate)
       } else {
-        start = try Date.validated(dateTimeString: startDate, timeZone: eventTimeZone ?? .current)
-        end = try Date.validated(dateTimeString: endDate, timeZone: eventTimeZone ?? .current)
+        start = try Date.validated(dateTimeString: startDate, timeZone: parsingTimeZone)
+        end = try Date.validated(dateTimeString: endDate, timeZone: parsingTimeZone)
       }
 
       try DateValidator.validateDateRange(start: start, end: end)
@@ -116,7 +122,8 @@
       notes: String? = nil,
       url: String? = nil,
       timeZoneIdentifier: String? = nil,
-      clearTimeZone: Bool = false
+      clearTimeZone: Bool = false,
+      dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
@@ -125,11 +132,16 @@
       }
 
       let updatedTimeZone = try TimeZoneValidator.resolve(identifier: timeZoneIdentifier)
-      let parsingTimeZone = CalendarTimeZoneUpdate.parsingTimeZone(
-        clearTimeZone: clearTimeZone,
-        requested: updatedTimeZone,
-        existing: ekEvent.timeZone
-      )
+      let parsingTimeZone: TimeZone
+      if dateFormatVersion == CalendarEvent.currentDateFormatVersion {
+        parsingTimeZone = CalendarTimeZoneUpdate.parsingTimeZone(
+          clearTimeZone: clearTimeZone,
+          requested: updatedTimeZone,
+          existing: ekEvent.timeZone
+        )
+      } else {
+        parsingTimeZone = .current
+      }
       let dateResolution = try CalendarDateInputResolver.resolve(
         currentIsAllDay: ekEvent.isAllDay,
         currentStart: ekEvent.startDate ?? Date(),

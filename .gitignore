@@ -10,7 +10,7 @@
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
 
 # Thumbnails
 ._*
@@ -83,6 +83,8 @@ playground.xcworkspace
 # .swiftpm
 
 .build/
+.build-arm64/
+.build-x86_64/
 
 # CocoaPods
 # We recommend against adding the Pods directory to your .gitignore. However

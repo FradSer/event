@@ -85,6 +85,12 @@ struct CalendarCommands: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Event notes")
     var notes: String?
 
+    @Option(
+      name: .long,
+      help: "Alert minutes before start (repeatable, e.g. --alarm 15 --alarm 60)"
+    )
+    var alarm: [Int] = []
+
     @Option(name: .long, help: "IANA timezone for a timed event (for example, America/New_York)")
     var timezone: String?
 
@@ -101,9 +107,14 @@ struct CalendarCommands: AsyncParsableCommand {
           calendarName: calendar,
           location: location,
           notes: notes,
+          alarmMinutes: alarm.isEmpty ? nil : alarm,
           timeZoneIdentifier: timezone
         )
       #else
+        guard alarm.isEmpty else {
+          throw EventCLIError.invalidInput(
+            "The --alarm flag is only supported on the macOS/EventKit backend")
+        }
         let backend = try await BackendFactory.makeCalendarBackend()
         let isAllDay = Date.isAllDayFormat(start) && Date.isAllDayFormat(end)
         let params = CreateEventParams(
@@ -153,13 +164,40 @@ struct CalendarCommands: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "New notes")
     var notes: String?
 
+    @Option(
+      name: .long,
+      help: "Replace all alerts with these minutes-before-start (repeatable)"
+    )
+    var alarm: [Int] = []
+
+    @Option(
+      name: .long,
+      help: "Add alerts (minutes before start) to the existing ones (repeatable)"
+    )
+    var addAlarm: [Int] = []
+
+    @Flag(name: .long, help: "Remove all alerts from the event")
+    var clearAlarms = false
+
     @Option(name: .long, help: "IANA timezone for a timed event (for example, America/New_York)")
     var timezone: String?
 
     @Flag(help: "Output in JSON format")
     var json = false
 
+    func validate() throws {
+      let modes = [!alarm.isEmpty, !addAlarm.isEmpty, clearAlarms].filter { $0 }.count
+      if modes > 1 {
+        throw ValidationError(
+          "Use only one of --alarm, --add-alarm, or --clear-alarms.")
+      }
+    }
+
     func run() async throws {
+      // alarmMinutes: nil = leave unchanged, [] = clear all, [..] = replace.
+      // addAlarmMinutes: nil = none to add, [..] = append to existing.
+      let alarmMinutes: [Int]? = clearAlarms ? [] : (alarm.isEmpty ? nil : alarm)
+      let addAlarmMinutes: [Int]? = addAlarm.isEmpty ? nil : addAlarm
       #if canImport(EventKit)
         let service = CalendarService()
         let event = try await service.updateEvent(
@@ -169,9 +207,15 @@ struct CalendarCommands: AsyncParsableCommand {
           endDate: end,
           location: location,
           notes: notes,
+          alarmMinutes: alarmMinutes,
+          addAlarmMinutes: addAlarmMinutes,
           timeZoneIdentifier: timezone
         )
       #else
+        guard alarm.isEmpty, addAlarm.isEmpty, !clearAlarms else {
+          throw EventCLIError.invalidInput(
+            "The --alarm/--add-alarm/--clear-alarms flags are only supported on the macOS/EventKit backend")
+        }
         let backend = try await BackendFactory.makeCalendarBackend()
         let params = UpdateEventParams(
           title: title,

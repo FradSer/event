@@ -55,6 +55,7 @@
       location: String? = nil,
       notes: String? = nil,
       url: String? = nil,
+      alarmMinutes: [Int]? = nil,
       timeZoneIdentifier: String? = nil,
       dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
@@ -97,6 +98,17 @@
         ekEvent.url = validURL
       }
 
+      // Add alarms (minutes before start; negative relative offset).
+      // Convert to Double before multiplying to avoid Int overflow traps, and
+      // skip duplicate offsets.
+      var addedAlarmOffsets = Set<TimeInterval>()
+      for minutes in alarmMinutes ?? [] {
+        let offset = -Double(minutes) * 60.0
+        if addedAlarmOffsets.insert(offset).inserted {
+          ekEvent.addAlarm(EKAlarm(relativeOffset: offset))
+        }
+      }
+
       // Set calendar
       if let calendarName = calendarName {
         let calendars = eventStore.calendars(for: .event).filter { $0.title == calendarName }
@@ -121,6 +133,8 @@
       location: String? = nil,
       notes: String? = nil,
       url: String? = nil,
+      alarmMinutes: [Int]? = nil,
+      addAlarmMinutes: [Int]? = nil,
       timeZoneIdentifier: String? = nil,
       clearTimeZone: Bool = false,
       dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
@@ -182,6 +196,34 @@
 
       if let urlString = url, let validURL = URL(string: urlString) {
         ekEvent.url = validURL
+      }
+
+      // Replace alarms when provided (minutes before start). [] clears all.
+      // Convert to Double before multiplying to avoid Int overflow traps, and
+      // skip duplicate offsets.
+      if let alarmMinutes = alarmMinutes {
+        for existing in ekEvent.alarms ?? [] {
+          ekEvent.removeAlarm(existing)
+        }
+        var offsets = Set<TimeInterval>()
+        for minutes in alarmMinutes {
+          let offset = -Double(minutes) * 60.0
+          if offsets.insert(offset).inserted {
+            ekEvent.addAlarm(EKAlarm(relativeOffset: offset))
+          }
+        }
+      }
+
+      // Append alarms without touching existing ones, skipping any offset the
+      // event already has or that repeats within this batch.
+      if let addAlarmMinutes = addAlarmMinutes {
+        var offsets = Set((ekEvent.alarms ?? []).map { $0.relativeOffset })
+        for minutes in addAlarmMinutes {
+          let offset = -Double(minutes) * 60.0
+          if offsets.insert(offset).inserted {
+            ekEvent.addAlarm(EKAlarm(relativeOffset: offset))
+          }
+        }
       }
 
       try DateValidator.validateDateRange(start: ekEvent.startDate, end: ekEvent.endDate)

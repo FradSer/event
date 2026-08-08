@@ -44,8 +44,8 @@ All commands support the `--json` flag to output results in JSON format, which i
 ## Reminders Management
 
 ### List & Search Reminders
-- List all incomplete reminders: `event reminders list`
-- List including completed: `event reminders list --completed`
+- List incomplete reminders: `event reminders list` — **completed reminders are hidden by default** (matches Reminders.app). A task you marked done disappears from this view; that is expected, not a deletion or a sync failure — the task still exists and its completion state syncs.
+- List including completed: `event reminders list --completed` — always use this when you need to confirm a task's completion state, including verifying that a completion synced to another device.
 - Filter by specific list: `event reminders list --list "List Name"`
 - Search by keyword in title and notes: `event reminders search --keyword "groceries"` (also accepts `--list` and `--completed`)
 
@@ -105,7 +105,9 @@ Sync reminders, calendar events, and lists across devices through a Cloudflare D
 
 On macOS, sync bridges EventKit and D1. On Linux, sync bridges the local SQLite database and D1 — so on a fresh Linux machine, `event sync` (or `event sync pull`) is the first step before any data is available to the other commands.
 
-**What syncs.** Basic fields plus `url`, `location`, `alarms`, `recurrenceRules`, and calendar `attendees` travel in the sync payload and are restored on pull — so they survive a cross-device sync. Tags, flagged status, and subtask relationships (`parentTitle`) are macOS/Shortcut-only and are **not** part of the sync payload; they must be set locally on each device.
+**What syncs.** Basic fields — including each reminder's completion state (`isCompleted` / `completionDate`) — plus `url`, `location`, `alarms`, `recurrenceRules`, and calendar `attendees` travel in the sync payload and are restored on pull, so they survive a cross-device sync. Tags, flagged status, and subtask relationships (`parentTitle`) are macOS/Shortcut-only and are **not** part of the sync payload; they must be set locally on each device.
+
+**Verifying a completion synced.** After marking a task done on one device, confirm it reached another device with `event reminders list --completed` on that device (or `event sync reminders list` to read the cloud store directly). Because `event reminders list` hides completed tasks by default, a task's absence from that default view does **not** mean the completion failed to sync.
 
 **D1-direct subcommands** bypass local storage and read/write the cloud backend directly: `event sync reminders list` / `event sync reminders create`, and `event sync calendar list`. Use these to inspect or seed the cloud store without touching EventKit or the local SQLite DB.
 

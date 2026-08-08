@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppleSyncKit
 import ArgumentParser
 import EventSync
@@ -126,3 +127,4 @@ public struct SyncDaemonCommand: AsyncParsableCommand {
     }
   }
 }
+#endif

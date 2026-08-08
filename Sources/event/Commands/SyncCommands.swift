@@ -19,13 +19,26 @@ enum SyncEntityType: String, ExpressibleByArgument, CaseIterable {
 // MARK: - Sync Commands
 
 struct SyncCommands: AsyncParsableCommand {
+  // `sync daemon` is macOS-only (launchd); keep it out of the command list on
+  // other platforms so the binary still compiles there.
+  private static let subcommands: [any AsyncParsableCommand.Type] = {
+    #if os(macOS)
+      return [
+        FullSync.self, Push.self, Pull.self, SyncConfigCommand.self, SyncStatusCommand.self,
+        SyncDaemonCommand.self, SyncRemindersCommands.self, SyncCalendarCommands.self,
+      ]
+    #else
+      return [
+        FullSync.self, Push.self, Pull.self, SyncConfigCommand.self, SyncStatusCommand.self,
+        SyncRemindersCommands.self, SyncCalendarCommands.self,
+      ]
+    #endif
+  }()
+
   static let configuration = CommandConfiguration(
     commandName: "sync",
     abstract: "Sync event data with Cloudflare D1",
-    subcommands: [
-      FullSync.self, Push.self, Pull.self, SyncConfigCommand.self, SyncStatusCommand.self,
-      SyncDaemonCommand.self, SyncRemindersCommands.self, SyncCalendarCommands.self,
-    ],
+    subcommands: subcommands,
     defaultSubcommand: FullSync.self
   )
 

@@ -1,9 +1,22 @@
 # Changelog
 
-## [Unreleased]
+## [0.6.0] - 2026-08-08
+
+### Added
+- Support per-event timezones (app)
+- Add alarm support to calendar create and update (app)
+- Add fail-fast guard for alarm flags (app)
+- Add sync daemon subcommand with background state tracking (sync)
+- Support legacy ISO 8601 dates (mod)
+
+### Changed
+- Standardize calendar timezone sync logic
+- Add datetime conversion utility (mod)
+- Preserve EventKit timezone
+- Clarify reminder sync and completion documentation (skl)
+- Document reminder continuation workflow (skl)
 
 ### Fixed
-
 - **Permission prompts no longer hang headless.** When no GUI session exists
   (SSH, launchd daemon/agent), the TCC prompt can never be rendered and
   `requestFullAccess*` never returns, blocking callers (e.g. the MCP server)
@@ -12,6 +25,11 @@
   (`EVENT_PERMISSION_TIMEOUT_MS`, milliseconds) with a domain-typed
   `Permission denied: Timed out waiting for ...` error. Fixes the Swift side
   of FradSer/mcp-server-apple-events#113.
+- Gracefully fall back when convertDateTime fails on timezone-only update (mod)
+- Drop synced timezone for all-day events on pull (app)
+- Preserve timezones during sync pull (app)
+- Validate dates in input timezone (mod)
+- Harden alarm offsets to avoid Int overflow and dedupe
 
 ## [0.4.0] - 2026-06-23
 

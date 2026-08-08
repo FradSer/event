@@ -41,12 +41,15 @@ If `$ARGUMENTS` is empty, do **not** default to listing. Instead, infer intent f
 
 All commands support the `--json` flag to output results in JSON format, which is easier to parse.
 
+**Parsing completion state — never grep the text markers on JSON.** The default text output marks completed reminders with `- [x]` and incomplete with `- [ ]`. The `--json` output has no such markers: it encodes each reminder as an object with a boolean `isCompleted` field. So to count or filter completed/incomplete from `--json`, parse `isCompleted` (e.g. `jq '[.[] | select(.isCompleted)] | length'`, or a Python `json` pass) — never `grep "[x]"` against JSON, which always returns 0 and falsely reads every reminder as incomplete.
+
 ## Reminders Management
 
 ### List & Search Reminders
 - List incomplete reminders: `event reminders list` — **completed reminders are hidden by default** (matches Reminders.app). A task you marked done disappears from this view; that is expected, not a deletion or a sync failure — the task still exists and its completion state syncs.
 - List including completed: `event reminders list --completed` — always use this when you need to confirm a task's completion state, including verifying that a completion synced to another device.
 - Filter by specific list: `event reminders list --list "List Name"`
+- To programmatically check completion, add `--json` and read the `isCompleted` boolean per item — do not `grep "[x]"` on JSON (see [General Usage](#general-usage)).
 - Search by keyword in title and notes: `event reminders search --keyword "groceries"` (also accepts `--list` and `--completed`)
 
 ### Create Reminders

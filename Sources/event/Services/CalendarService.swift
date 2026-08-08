@@ -54,22 +54,34 @@
       calendarName: String? = nil,
       location: String? = nil,
       notes: String? = nil,
-      url: String? = nil
+      url: String? = nil,
+      alarmMinutes: [Int]? = nil,
+      timeZoneIdentifier: String? = nil,
+      dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
       // Detect if this is an all-day event
       let isAllDay = Date.isAllDayFormat(startDate) && Date.isAllDayFormat(endDate)
+      if isAllDay, timeZoneIdentifier != nil {
+        throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+      }
+      let eventTimeZone = try TimeZoneValidator.resolve(identifier: timeZoneIdentifier)
 
       let start: Date
       let end: Date
+
+      let parsingTimeZone =
+        dateFormatVersion == CalendarEvent.currentDateFormatVersion
+        ? eventTimeZone ?? .current
+        : .current
 
       if isAllDay {
         start = try Date.validated(dateString: startDate)
         end = try Date.validated(dateString: endDate)
       } else {
-        start = try Date.validated(dateTimeString: startDate)
-        end = try Date.validated(dateTimeString: endDate)
+        start = try Date.validated(dateTimeString: startDate, timeZone: parsingTimeZone)
+        end = try Date.validated(dateTimeString: endDate, timeZone: parsingTimeZone)
       }
 
       try DateValidator.validateDateRange(start: start, end: end)
@@ -81,8 +93,20 @@
       ekEvent.isAllDay = isAllDay
       ekEvent.location = location
       ekEvent.notes = notes
+      ekEvent.timeZone = eventTimeZone
       if let urlString = url, let validURL = URL(string: urlString) {
         ekEvent.url = validURL
+      }
+
+      // Add alarms (minutes before start; negative relative offset).
+      // Convert to Double before multiplying to avoid Int overflow traps, and
+      // skip duplicate offsets.
+      var addedAlarmOffsets = Set<TimeInterval>()
+      for minutes in alarmMinutes ?? [] {
+        let offset = -Double(minutes) * 60.0
+        if addedAlarmOffsets.insert(offset).inserted {
+          ekEvent.addAlarm(EKAlarm(relativeOffset: offset))
+        }
       }
 
       // Set calendar
@@ -108,7 +132,12 @@
       endDate: String? = nil,
       location: String? = nil,
       notes: String? = nil,
-      url: String? = nil
+      url: String? = nil,
+      alarmMinutes: [Int]? = nil,
+      addAlarmMinutes: [Int]? = nil,
+      timeZoneIdentifier: String? = nil,
+      clearTimeZone: Bool = false,
+      dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
       try await permissionService.ensureCalendarAccess()
 
@@ -116,13 +145,29 @@
         throw EventCLIError.notFound("Event with ID '\(id)' not found")
       }
 
+      let updatedTimeZone = try TimeZoneValidator.resolve(identifier: timeZoneIdentifier)
+      let parsingTimeZone: TimeZone
+      if dateFormatVersion == CalendarEvent.currentDateFormatVersion {
+        parsingTimeZone = CalendarTimeZoneUpdate.parsingTimeZone(
+          clearTimeZone: clearTimeZone,
+          requested: updatedTimeZone,
+          existing: ekEvent.timeZone
+        )
+      } else {
+        parsingTimeZone = .current
+      }
       let dateResolution = try CalendarDateInputResolver.resolve(
         currentIsAllDay: ekEvent.isAllDay,
         currentStart: ekEvent.startDate ?? Date(),
         currentEnd: ekEvent.endDate ?? Date(),
         startInput: startDate,
-        endInput: endDate
+        endInput: endDate,
+        timeZone: parsingTimeZone
       )
+
+      if dateResolution.isAllDay, timeZoneIdentifier != nil {
+        throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+      }
 
       if let title = title {
         ekEvent.title = title
@@ -134,6 +179,13 @@
         ekEvent.isAllDay = dateResolution.isAllDay
       }
 
+      ekEvent.timeZone = CalendarTimeZoneUpdate.resolvedTimeZone(
+        isAllDay: dateResolution.isAllDay,
+        clearTimeZone: clearTimeZone,
+        requested: updatedTimeZone,
+        existing: ekEvent.timeZone
+      )
+
       if let location = location {
         ekEvent.location = location
       }
@@ -144,6 +196,34 @@
 
       if let urlString = url, let validURL = URL(string: urlString) {
         ekEvent.url = validURL
+      }
+
+      // Replace alarms when provided (minutes before start). [] clears all.
+      // Convert to Double before multiplying to avoid Int overflow traps, and
+      // skip duplicate offsets.
+      if let alarmMinutes = alarmMinutes {
+        for existing in ekEvent.alarms ?? [] {
+          ekEvent.removeAlarm(existing)
+        }
+        var offsets = Set<TimeInterval>()
+        for minutes in alarmMinutes {
+          let offset = -Double(minutes) * 60.0
+          if offsets.insert(offset).inserted {
+            ekEvent.addAlarm(EKAlarm(relativeOffset: offset))
+          }
+        }
+      }
+
+      // Append alarms without touching existing ones, skipping any offset the
+      // event already has or that repeats within this batch.
+      if let addAlarmMinutes = addAlarmMinutes {
+        var offsets = Set((ekEvent.alarms ?? []).map { $0.relativeOffset })
+        for minutes in addAlarmMinutes {
+          let offset = -Double(minutes) * 60.0
+          if offsets.insert(offset).inserted {
+            ekEvent.addAlarm(EKAlarm(relativeOffset: offset))
+          }
+        }
       }
 
       try DateValidator.validateDateRange(start: ekEvent.startDate, end: ekEvent.endDate)
@@ -202,7 +282,8 @@
         calendarName: params.calendarName,
         location: params.location,
         notes: params.notes,
-        url: params.url
+        url: params.url,
+        timeZoneIdentifier: params.timeZoneIdentifier
       )
     }
 
@@ -214,7 +295,8 @@
         endDate: params.endDate,
         location: params.location,
         notes: params.notes,
-        url: params.url
+        url: params.url,
+        timeZoneIdentifier: params.timeZoneIdentifier
       )
     }
 

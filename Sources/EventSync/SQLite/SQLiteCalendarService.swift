@@ -1,3 +1,4 @@
+import AppleSyncKit
 import EventModels
 import Foundation
 import SQLite
@@ -22,10 +23,8 @@ public actor SQLiteCalendarService: CalendarBackend {
     var sql = """
       SELECT data FROM calendar_events
       WHERE deleted = 0
-        AND json_extract(data, '$.startDate') <= ?
-        AND json_extract(data, '$.endDate') >= ?
       """
-    var bindings: [Binding?] = [end, start]
+    var bindings: [Binding?] = []
 
     if let calendarName {
       sql += " AND json_extract(data, '$.calendar') = ?"
@@ -34,8 +33,10 @@ public actor SQLiteCalendarService: CalendarBackend {
 
     sql += " ORDER BY json_extract(data, '$.startDate') ASC"
 
-    return try connection.prepare(sql, bindings).map { row in
-      try Self.decodeEvent(from: row[0])
+    let range = CalendarEvent.syncDateRange(start: start, end: end)
+    return try connection.prepare(sql, bindings).compactMap { row in
+      let event = try Self.decodeEvent(from: row[0])
+      return event.syncDateRange().overlaps(range) ? event : nil
     }
   }
 
@@ -50,7 +51,11 @@ public actor SQLiteCalendarService: CalendarBackend {
   // MARK: - Create
 
   public func createEvent(_ params: CreateEventParams) async throws -> CalendarEvent {
-    let now = ISO8601DateFormatter.eventISO8601.string(from: Date())
+    let timeZone = try TimeZoneValidator.resolve(identifier: params.timeZoneIdentifier)
+    if params.isAllDay, timeZone != nil {
+      throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+    }
+    let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
     let id = UUID().uuidString
 
     let calendarName = params.calendarName ?? "Calendar"
@@ -64,7 +69,7 @@ public actor SQLiteCalendarService: CalendarBackend {
       location: params.location,
       notes: params.notes,
       url: params.url,
-      timeZone: TimeZone.current.identifier,
+      timeZone: timeZone?.identifier ?? (params.isAllDay ? nil : TimeZone.current.identifier),
       creationDate: now,
       lastModifiedDate: now,
       status: nil,
@@ -94,19 +99,45 @@ public actor SQLiteCalendarService: CalendarBackend {
     params: UpdateEventParams
   ) async throws -> CalendarEvent {
     let existing = try await fetchEvent(byId: id)
-    let now = ISO8601DateFormatter.eventISO8601.string(from: Date())
+    let timeZone = try TimeZoneValidator.resolve(identifier: params.timeZoneIdentifier)
+    let isAllDay = params.isAllDay ?? existing.isAllDay
+    if isAllDay, timeZone != nil {
+      throw EventCLIError.invalidInput("--timezone is only supported for timed events")
+    }
+    let existingTimeZone =
+      try TimeZoneValidator.resolve(identifier: existing.timeZone) ?? .current
+    let startDate: String
+    if let startDateInput = params.startDate {
+      startDate = startDateInput
+    } else if let timeZone, !isAllDay, existing.usesEventTimeZoneDateFormat {
+      startDate = (try? DateValidator.convertDateTime(
+        existing.startDate, from: existingTimeZone, to: timeZone)) ?? existing.startDate
+    } else {
+      startDate = existing.startDate
+    }
+    let endDate: String
+    if let endDateInput = params.endDate {
+      endDate = endDateInput
+    } else if let timeZone, !isAllDay, existing.usesEventTimeZoneDateFormat {
+      endDate = (try? DateValidator.convertDateTime(
+        existing.endDate, from: existingTimeZone, to: timeZone)) ?? existing.endDate
+    } else {
+      endDate = existing.endDate
+    }
+    let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
 
     let updatedEvent = CalendarEvent(
       id: existing.id,
       title: params.title ?? existing.title,
       calendar: existing.calendar,
-      startDate: params.startDate ?? existing.startDate,
-      endDate: params.endDate ?? existing.endDate,
-      isAllDay: params.isAllDay ?? existing.isAllDay,
+      startDate: startDate,
+      endDate: endDate,
+      isAllDay: isAllDay,
       location: params.location ?? existing.location,
       notes: params.notes ?? existing.notes,
       url: params.url ?? existing.url,
-      timeZone: existing.timeZone,
+      timeZone: isAllDay ? nil : timeZone?.identifier ?? existing.timeZone,
+      dateFormatVersion: existing.dateFormatVersion,
       creationDate: existing.creationDate,
       lastModifiedDate: now,
       status: existing.status,
@@ -133,7 +164,7 @@ public actor SQLiteCalendarService: CalendarBackend {
   // MARK: - Delete
 
   public func deleteEvent(id: String) async throws {
-    let now = ISO8601DateFormatter.eventISO8601.string(from: Date())
+    let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
     try connection.run(
       """
       UPDATE calendar_events

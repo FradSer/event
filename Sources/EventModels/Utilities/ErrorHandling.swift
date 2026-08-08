@@ -1,8 +1,9 @@
+import AppleSyncKit
 import Foundation
 
 // MARK: - Error Handling
 
-public enum EventCLIError: LocalizedError, Sendable {
+public enum EventCLIError: LocalizedError, Sendable, SyncNotFound {
   case permissionDenied(String)
   case notFound(String)
   case invalidInput(String)
@@ -11,6 +12,12 @@ public enum EventCLIError: LocalizedError, Sendable {
   case invalidDateRange(String)
   case dateOutOfRange(String)
   case unknown(String)
+
+  /// Lets the shared sync engine recognize this as a not-found failure.
+  public var isNotFound: Bool {
+    if case .notFound = self { return true }
+    return false
+  }
 
   public var errorDescription: String? {
     switch self {

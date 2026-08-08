@@ -1,3 +1,4 @@
+import AppleSyncKit
 import ArgumentParser
 import EventCommands
 import EventModels
@@ -23,7 +24,7 @@ struct SyncCommands: AsyncParsableCommand {
     abstract: "Sync event data with Cloudflare D1",
     subcommands: [
       FullSync.self, Push.self, Pull.self, SyncConfigCommand.self, SyncStatusCommand.self,
-      SyncRemindersCommands.self, SyncCalendarCommands.self,
+      SyncDaemonCommand.self, SyncRemindersCommands.self, SyncCalendarCommands.self,
     ],
     defaultSubcommand: FullSync.self
   )
@@ -54,8 +55,22 @@ struct SyncCommands: AsyncParsableCommand {
     @Flag(help: "Output in JSON format")
     var json = false
 
+    @Flag(help: .hidden)
+    var daemon = false
+
     func run() async throws {
-      let lockFd = try SyncConfigStore.acquireLock()
+      let lockFd: Int32
+      do {
+        lockFd = try SyncConfigStore.acquireLock()
+      } catch SyncError.alreadyRunning {
+        // A launchd-triggered run that collides with a manual sync skips
+        // quietly instead of failing; the next interval catches up.
+        if daemon {
+          print("Another sync is in progress, skipping.")
+          return
+        }
+        throw SyncError.alreadyRunning
+      }
       defer { SyncConfigStore.releaseLock(lockFd) }
 
       let service = try await BackendFactory.makeSyncService()
@@ -64,10 +79,29 @@ struct SyncCommands: AsyncParsableCommand {
         let pushOutput = try await runPush(service, type: type)
         try await service.shutdown()
         printFullSyncOutput(pull: pullOutput, push: pushOutput, json: json)
+        if daemon {
+          recordLastRun(error: nil, pull: pullOutput, push: pushOutput)
+        }
       } catch {
         try? await service.shutdown()
+        if daemon {
+          recordLastRun(error: error.localizedDescription, pull: [:], push: [:])
+        }
         throw error
       }
+    }
+
+    /// Writes `~/.config/event-sync/last-run.json` for `sync daemon status`.
+    private func recordLastRun(
+      error: String?,
+      pull: [String: PullSummary],
+      push: [String: PushResult]
+    ) {
+      var summary = pullLines(pull)
+      summary.append(contentsOf: pushLines(push))
+      let lastRun = SyncLastRun(
+        finishedAt: Date(), succeeded: error == nil, error: error, summary: summary)
+      try? SyncConfigStore.saveLastRun(lastRun)
     }
   }
 
@@ -146,7 +180,9 @@ struct SyncCommands: AsyncParsableCommand {
 // MARK: - Sync Sequencing
 
 /// Pushes the requested entity types, returning results keyed by entity.
-func runPush(_ service: any SyncServiceProtocol, type: SyncEntityType) async throws -> [String: PushResult] {
+func runPush(_ service: any SyncServiceProtocol, type: SyncEntityType) async throws -> [String:
+  PushResult]
+{
   var output: [String: PushResult] = [:]
   switch type {
   case .reminders:
@@ -164,7 +200,9 @@ func runPush(_ service: any SyncServiceProtocol, type: SyncEntityType) async thr
 }
 
 /// Pulls the requested entity types in dependency order, returning results keyed by entity.
-func runPull(_ service: any SyncServiceProtocol, type: SyncEntityType) async throws -> [String: PullSummary] {
+func runPull(_ service: any SyncServiceProtocol, type: SyncEntityType) async throws -> [String:
+  PullSummary]
+{
   var output: [String: PullSummary] = [:]
   switch type {
   case .reminders:

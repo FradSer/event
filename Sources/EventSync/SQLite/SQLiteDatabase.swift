@@ -1,3 +1,4 @@
+import AppleSyncKit
 import EventModels
 import Foundation
 import SQLite
@@ -8,9 +9,9 @@ import SQLite
 public actor SQLiteDatabase {
   // MARK: - Properties
 
-  // SQLite.swift's Connection serializes access internally, so it is safe to
-  // hand out from a nonisolated context even though it is not Sendable.
-  private nonisolated(unsafe) let connection: Connection
+  // SQLite.swift's Connection is Sendable (conformance from AppleSyncKit), so it
+  // can be handed out from a nonisolated context.
+  private nonisolated let connection: Connection
 
   /// Default database path at ~/.local/share/event-sync/local.db
   public static var defaultPath: String {
@@ -93,72 +94,79 @@ public actor SQLiteDatabase {
 
   private static func runMigrations(on connection: Connection) throws {
     // Check current schema version
-    let currentVersion = try connection.scalar(
-      "PRAGMA user_version"
-    ) as! Int64
+    let currentVersion =
+      try connection.scalar(
+        "PRAGMA user_version"
+      ) as! Int64
 
     guard currentVersion < 1 else { return }
 
     // Migration v1: Create initial tables
     try connection.transaction {
       // Main data tables
-      try connection.execute("""
-        CREATE TABLE IF NOT EXISTS reminders (
-          id TEXT PRIMARY KEY,
-          data TEXT NOT NULL,
-          last_modified TEXT NOT NULL,
-          deleted INTEGER DEFAULT 0,
-          updated_at TEXT DEFAULT (datetime('now')),
-          is_local_only INTEGER DEFAULT 0
-        )
-      """)
+      try connection.execute(
+        """
+          CREATE TABLE IF NOT EXISTS reminders (
+            id TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            last_modified TEXT NOT NULL,
+            deleted INTEGER DEFAULT 0,
+            updated_at TEXT DEFAULT (datetime('now')),
+            is_local_only INTEGER DEFAULT 0
+          )
+        """)
 
-      try connection.execute("""
-        CREATE TABLE IF NOT EXISTS calendar_events (
-          id TEXT PRIMARY KEY,
-          data TEXT NOT NULL,
-          last_modified TEXT NOT NULL,
-          deleted INTEGER DEFAULT 0,
-          updated_at TEXT DEFAULT (datetime('now')),
-          is_local_only INTEGER DEFAULT 0
-        )
-      """)
+      try connection.execute(
+        """
+          CREATE TABLE IF NOT EXISTS calendar_events (
+            id TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            last_modified TEXT NOT NULL,
+            deleted INTEGER DEFAULT 0,
+            updated_at TEXT DEFAULT (datetime('now')),
+            is_local_only INTEGER DEFAULT 0
+          )
+        """)
 
-      try connection.execute("""
-        CREATE TABLE IF NOT EXISTS reminder_lists (
-          id TEXT PRIMARY KEY,
-          data TEXT NOT NULL,
-          last_modified TEXT NOT NULL,
-          deleted INTEGER DEFAULT 0,
-          updated_at TEXT DEFAULT (datetime('now')),
-          is_local_only INTEGER DEFAULT 0
-        )
-      """)
+      try connection.execute(
+        """
+          CREATE TABLE IF NOT EXISTS reminder_lists (
+            id TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            last_modified TEXT NOT NULL,
+            deleted INTEGER DEFAULT 0,
+            updated_at TEXT DEFAULT (datetime('now')),
+            is_local_only INTEGER DEFAULT 0
+          )
+        """)
 
       // Sync metadata tables
-      try connection.execute("""
-        CREATE TABLE IF NOT EXISTS sync_cursors (
-          entity_type TEXT PRIMARY KEY,
-          cursor TEXT
-        )
-      """)
+      try connection.execute(
+        """
+          CREATE TABLE IF NOT EXISTS sync_cursors (
+            entity_type TEXT PRIMARY KEY,
+            cursor TEXT
+          )
+        """)
 
-      try connection.execute("""
-        CREATE TABLE IF NOT EXISTS sync_id_mappings (
-          remote_id TEXT PRIMARY KEY,
-          local_id TEXT NOT NULL,
-          entity_type TEXT NOT NULL
-        )
-      """)
+      try connection.execute(
+        """
+          CREATE TABLE IF NOT EXISTS sync_id_mappings (
+            remote_id TEXT PRIMARY KEY,
+            local_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL
+          )
+        """)
 
-      try connection.execute("""
-        CREATE TABLE IF NOT EXISTS sync_state (
-          remote_id TEXT PRIMARY KEY,
-          entity_type TEXT NOT NULL,
-          last_modified TEXT NOT NULL,
-          snapshot TEXT
-        )
-      """)
+      try connection.execute(
+        """
+          CREATE TABLE IF NOT EXISTS sync_state (
+            remote_id TEXT PRIMARY KEY,
+            entity_type TEXT NOT NULL,
+            last_modified TEXT NOT NULL,
+            snapshot TEXT
+          )
+        """)
 
       // Create indexes on updated_at for performance
       try connection.execute(

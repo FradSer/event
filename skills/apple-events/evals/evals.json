@@ -52,6 +52,38 @@
           "description": "The output file `calendar_events.md` exists and contains a list of calendar events, or a message saying none were found."
         }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "remind me to call the dentist tomorrow at 3pm",
+      "expected_output": "Interprets the free-form instruction and creates a reminder via `event reminders create` with a title about calling the dentist and a `--due` resolved to tomorrow at 15:00:00.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Created as a reminder",
+          "description": "A reminder (not a calendar event) was created via `event reminders create` with a title referencing the dentist call."
+        },
+        {
+          "name": "Relative date resolved",
+          "description": "The `--due` value is an absolute `yyyy-MM-dd HH:mm:ss` timestamp set to the next calendar day at 15:00:00, derived from the current date."
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I just agreed with my manager to deliver the Q3 budget report by this Friday. Now invoke the apple-events skill with no arguments.",
+      "expected_output": "With no explicit instruction, the skill infers an actionable item from the conversation, classifies it as a task vs event, and asks the user to confirm before creating anything (via AskUserQuestion). It must NOT silently list reminders/events and must NOT create without confirmation.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Captures context instead of listing",
+          "description": "The skill identifies the 'deliver Q3 budget report by Friday' commitment from the conversation rather than defaulting to a `event reminders list` / `event calendar list` read."
+        },
+        {
+          "name": "Asks before creating",
+          "description": "The skill asks the user to confirm the inferred item (proposing a reminder/task or a calendar event with a due/start date) and does not create anything in EventKit before getting confirmation."
+        }
+      ]
     }
   ]
 }

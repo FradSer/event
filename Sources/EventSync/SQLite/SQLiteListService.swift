@@ -1,3 +1,4 @@
+import AppleSyncKit
 import EventModels
 import Foundation
 import SQLite
@@ -26,7 +27,7 @@ public actor SQLiteListService: ListsBackend {
       isImmutable: false
     )
 
-    let now = ISO8601DateFormatter.eventISO8601.string(from: Date())
+    let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
     let jsonString = try Self.encode(list)
 
     try connection.run(
@@ -63,13 +64,15 @@ public actor SQLiteListService: ListsBackend {
     }
 
     if let title = title {
-      list = ReminderList(id: list.id, title: title, color: list.color, isImmutable: list.isImmutable)
+      list = ReminderList(
+        id: list.id, title: title, color: list.color, isImmutable: list.isImmutable)
     }
     if let color = color {
-      list = ReminderList(id: list.id, title: list.title, color: color, isImmutable: list.isImmutable)
+      list = ReminderList(
+        id: list.id, title: list.title, color: color, isImmutable: list.isImmutable)
     }
 
-    let now = ISO8601DateFormatter.eventISO8601.string(from: Date())
+    let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
     let jsonString = try Self.encode(list)
 
     try connection.run(

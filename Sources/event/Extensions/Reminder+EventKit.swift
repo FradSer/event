@@ -22,7 +22,7 @@
       let recurrenceRules = ekReminder.recurrenceRules?.map { RecurrenceRule(from: $0) }
       let locationTrigger = ekReminder.alarms?.compactMap { LocationTrigger(from: $0) }.first
 
-      let utcFormatter = ISO8601DateFormatter.eventISO8601
+      let utcFormatter = ISO8601DateFormatter.syncISO8601
 
       self.init(
         id: ekReminder.calendarItemIdentifier,

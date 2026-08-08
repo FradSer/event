@@ -16,10 +16,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          - os: macos-26
             platform: darwin
             arch: arm64
-          - os: macos-latest
+          - os: macos-26
             platform: darwin
             arch: amd64
           - os: ubuntu-24.04
@@ -34,9 +34,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Select Xcode with Swift 6.2 (macOS)
+        if: matrix.platform == 'darwin'
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - name: Build (macOS)
         if: matrix.platform == 'darwin'
         run: |
+          # Fetch the SSH-URL apple-sync-kit dependency over anonymous HTTPS (public repo, no key).
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
           ARCH_FLAG=""
           [ "${{ matrix.arch }}" = "amd64" ] && ARCH_FLAG="--arch x86_64"
           swift build -c release $ARCH_FLAG
@@ -48,8 +56,8 @@ jobs:
           docker run --rm \
             -v "$PWD":/app \
             -w /app \
-            swift:6.0-jammy \
-            bash -c "swift build -c release --static-swift-stdlib"
+            swift:6.2-noble \
+            bash -c "git config --global url.https://github.com/.insteadOf git@github.com: && swift build -c release --static-swift-stdlib"
           echo "BIN_PATH=.build/release" >> "$GITHUB_ENV"
 
       - name: Create archive
@@ -130,5 +138,9 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           git add Formula/event.rb
-          git commit -m "chore: update event to ${VERSION}"
-          git push
+          if git diff --cached --quiet; then
+            echo "Formula already up to date; nothing to commit."
+          else
+            git commit -m "chore: update event to ${VERSION}"
+            git push
+          fi

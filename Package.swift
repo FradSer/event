@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
@@ -11,15 +11,16 @@ let package = Package(
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
-    .package(url: "https://github.com/swift-server/async-http-client", from: "1.21.0"),
-    .package(url: "https://github.com/apple/swift-crypto", from: "3.0.0"),
-    .package(url: "https://github.com/stephencelis/SQLite.swift", from: "0.15.3"),
+    .package(
+      url: "https://github.com/stephencelis/SQLite.swift", from: "0.15.3",
+      traits: ["SQLiteSwiftCSQLite"]),
+    .package(url: "git@github.com:FradSer/apple-sync-kit.git", from: "0.4.0"),
   ],
   targets: [
     .target(
       name: "EventModels",
       dependencies: [
-        .product(name: "Crypto", package: "swift-crypto"),
+        .product(name: "AppleSyncKit", package: "apple-sync-kit")
       ],
       path: "Sources/EventModels"
     ),
@@ -27,7 +28,7 @@ let package = Package(
       name: "EventSync",
       dependencies: [
         "EventModels",
-        .product(name: "AsyncHTTPClient", package: "async-http-client"),
+        .product(name: "AppleSyncKit", package: "apple-sync-kit"),
         .product(name: "SQLite", package: "SQLite.swift"),
       ],
       path: "Sources/EventSync"
@@ -37,6 +38,7 @@ let package = Package(
       dependencies: [
         "EventModels",
         "EventSync",
+        .product(name: "AppleSyncKit", package: "apple-sync-kit"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       path: "Sources/EventCommands"
@@ -47,6 +49,7 @@ let package = Package(
         "EventModels",
         "EventSync",
         "EventCommands",
+        .product(name: "AppleSyncKit", package: "apple-sync-kit"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       path: "Sources/event",
@@ -55,13 +58,11 @@ let package = Package(
       ]
     ),
     .testTarget(
-      name: "EventModelsTests",
-      dependencies: ["EventModels"],
-      path: "Tests/EventModelsTests"
-    ),
-    .testTarget(
       name: "EventSyncTests",
-      dependencies: ["EventSync"],
+      dependencies: [
+        "EventSync",
+        .product(name: "AppleSyncKit", package: "apple-sync-kit"),
+      ],
       path: "Tests/EventSyncTests"
     ),
     .testTarget(
@@ -69,5 +70,6 @@ let package = Package(
       dependencies: ["event"],
       path: "Tests/eventTests"
     ),
-  ]
+  ],
+  swiftLanguageModes: [.v6]
 )

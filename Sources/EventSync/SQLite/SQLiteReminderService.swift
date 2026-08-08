@@ -1,3 +1,4 @@
+import AppleSyncKit
 import EventModels
 import Foundation
 import SQLite
@@ -49,7 +50,7 @@ public actor SQLiteReminderService: RemindersBackend {
   // MARK: - Create
 
   public func createReminder(_ params: CreateReminderParams) async throws -> Reminder {
-    let now = ISO8601DateFormatter.eventISO8601.string(from: Date())
+    let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
     let id = UUID().uuidString
 
     let reminder = Reminder(
@@ -94,7 +95,7 @@ public actor SQLiteReminderService: RemindersBackend {
     params: UpdateReminderParams
   ) async throws -> Reminder {
     let existing = try await fetchReminder(byId: id)
-    let now = ISO8601DateFormatter.eventISO8601.string(from: Date())
+    let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
 
     let updated = Reminder(
       id: existing.id,
@@ -136,7 +137,7 @@ public actor SQLiteReminderService: RemindersBackend {
   // MARK: - Delete
 
   public func deleteReminder(id: String) async throws {
-    let now = ISO8601DateFormatter.eventISO8601.string(from: Date())
+    let now = ISO8601DateFormatter.syncISO8601.string(from: Date())
     try connection.run(
       """
       UPDATE reminders

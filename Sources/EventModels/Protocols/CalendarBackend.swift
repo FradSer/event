@@ -3,7 +3,8 @@ import Foundation
 // MARK: - Calendar Backend Protocol
 
 public protocol CalendarBackend: Sendable {
-  func fetchEvents(start: String, end: String, calendarName: String?) async throws -> [CalendarEvent]
+  func fetchEvents(start: String, end: String, calendarName: String?) async throws
+    -> [CalendarEvent]
   func fetchEvent(byId id: String) async throws -> CalendarEvent
   func createEvent(_ params: CreateEventParams) async throws -> CalendarEvent
   func updateEvent(id: String, params: UpdateEventParams) async throws -> CalendarEvent
@@ -21,6 +22,7 @@ public struct CreateEventParams: Sendable {
   public let location: String?
   public let notes: String?
   public let url: String?
+  public let timeZoneIdentifier: String?
 
   public init(
     title: String,
@@ -30,7 +32,8 @@ public struct CreateEventParams: Sendable {
     isAllDay: Bool = false,
     location: String? = nil,
     notes: String? = nil,
-    url: String? = nil
+    url: String? = nil,
+    timeZoneIdentifier: String? = nil
   ) {
     self.title = title
     self.calendarName = calendarName
@@ -40,6 +43,7 @@ public struct CreateEventParams: Sendable {
     self.location = location
     self.notes = notes
     self.url = url
+    self.timeZoneIdentifier = timeZoneIdentifier
   }
 }
 
@@ -53,6 +57,7 @@ public struct UpdateEventParams: Sendable {
   public let location: String?
   public let notes: String?
   public let url: String?
+  public let timeZoneIdentifier: String?
 
   public init(
     title: String? = nil,
@@ -61,7 +66,8 @@ public struct UpdateEventParams: Sendable {
     isAllDay: Bool? = nil,
     location: String? = nil,
     notes: String? = nil,
-    url: String? = nil
+    url: String? = nil,
+    timeZoneIdentifier: String? = nil
   ) {
     self.title = title
     self.startDate = startDate
@@ -70,5 +76,6 @@ public struct UpdateEventParams: Sendable {
     self.location = location
     self.notes = notes
     self.url = url
+    self.timeZoneIdentifier = timeZoneIdentifier
   }
 }

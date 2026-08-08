@@ -1,3 +1,4 @@
+import AppleSyncKit
 import EventModels
 import XCTest
 
@@ -69,21 +70,21 @@ final class BackendFactoryTests: XCTestCase {
   /// on every platform. Local backends no longer require config, but sync does.
   func testConfigRequiresBothVariables() throws {
     XCTAssertThrowsError(
-      try CloudflareConfig.loadFromEnvironment(
+      try SyncConfigStore.store.loadFromEnvironment(
         [SyncConfigStore.EnvKey.apiURL: "https://example.com"]
       )
     ) { error in
-      guard let cliError = error as? EventCLIError else {
-        XCTFail("Expected EventCLIError, got \(type(of: error))")
+      guard let syncError = error as? SyncError else {
+        XCTFail("Expected SyncError, got \(type(of: error))")
         return
       }
-      if case .invalidInput(let message) = cliError {
+      if case .invalidInput(let message) = syncError {
         XCTAssertTrue(
           message.contains("Both"),
           "Error message should mention both variables are required"
         )
       } else {
-        XCTFail("Expected invalidInput, got \(cliError)")
+        XCTFail("Expected invalidInput, got \(syncError)")
       }
     }
   }

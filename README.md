@@ -61,6 +61,8 @@ Alternatively, enable permissions in System Settings:
 - System Settings > Privacy & Security > Reminders > Enable Terminal
 - System Settings > Privacy & Security > Calendars > Enable Terminal
 
+When run headless (SSH, launchd agent/daemon) the prompt cannot be displayed, so `event` returns a permission error immediately. If the prompt is pending but unanswerable (some launchd contexts), the request gives up after 15 s and reports `Permission denied: Timed out waiting for ...`. Tune the wait with `EVENT_PERMISSION_TIMEOUT_MS` (must stay below the MCP server's `EVENTKIT_CLI_TIMEOUT_MS` kill timeout of 30 s so the CLI answers with a readable error first).
+
 ## Usage
 
 ### Reminders
@@ -93,7 +95,17 @@ event calendar list --start "2026-03-01" --end "2026-03-31"
 
 # Create an event
 event calendar create --title "Meeting" --start "2026-03-10 14:00:00" --end "2026-03-10 15:00:00"
+
+# Create a timed event in an explicit IANA timezone
+event calendar create --title "New York meeting" --start "2026-03-10 14:00:00" --end "2026-03-10 15:00:00" --timezone America/New_York
+
+# On macOS, change a timed event's timezone without changing its start or end instant
+event calendar update --id EVENT_ID --timezone America/Los_Angeles
 ```
+
+`--timezone` accepts an IANA timezone identifier and applies only to timed events. On macOS, create and update parse timed input in the supplied timezone; updates without a new date preserve the event's start and end instants. On Linux and through sync backends, the identifier is retained as event metadata.
+
+Calendar sync payloads include a date-format version so newer clients can distinguish timezone-aware dates from records written by older clients. Legacy records without this marker keep their previous machine-local interpretation until they are reserialized by an authoritative macOS device; the original source machine timezone cannot be recovered from the legacy payload alone. Re-sync older calendar records from that device before relying on their per-event timezone across machines.
 
 ### Lists
 
@@ -112,11 +124,14 @@ through a Cloudflare Worker backed by D1.
 
 #### 1. Deploy the Worker (one-time)
 
+The Worker source is a snapshot of the canonical
+[apple-sync-kit/worker](https://github.com/FradSer/apple-sync-kit/tree/main/worker),
+pre-configured for event (`ENTITIES="reminders,calendar_events,reminder_lists"`).
+
 ```bash
 cd skills/apple-events/references/worker
 pnpm install
 pnpm exec wrangler login
-cp wrangler.toml.example wrangler.toml    # copy the config template
 pnpm exec wrangler d1 create event-sync   # copy the database_id into wrangler.toml
 pnpm run db:migrate:remote                # create the D1 tables
 openssl rand -hex 32 | pnpm exec wrangler secret put API_TOKEN   # auto-generate and set a strong shared token
@@ -124,7 +139,7 @@ pnpm run deploy                           # prints https://<worker>.workers.dev
 ```
 
 > **Upgrading an existing deployment:** the pull cursor is keyed on a monotonic
-> `seq` column added by migration `0002_seq_cursor`. Re-run
+> `seq` column added by migration `0002_events_seq_cursor`. Re-run
 > `pnpm run db:migrate:remote` and then `pnpm run deploy` after pulling these
 > changes. Devices stored with an older timestamp cursor self-heal on their next
 > pull (they restart from the beginning once and re-converge), so no client
@@ -185,6 +200,13 @@ The [`apple-events`](skills/apple-events/) skill lets AI agents manage your Appl
    ```bash
    npx skills add https://github.com/FradSer/event --skill apple-events
    ```
+
+## Related Projects
+
+- [apple-sync-kit](https://github.com/FradSer/apple-sync-kit) — shared sync
+  library and canonical D1 Worker (`worker/`) that powers `event sync`
+- [note](https://github.com/FradSer/note) — companion CLI for Apple Notes;
+  same architecture, separate backend
 
 ## License
 

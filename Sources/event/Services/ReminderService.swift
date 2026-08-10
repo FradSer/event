@@ -13,7 +13,9 @@
     /// Fetch reminders with optional filters
     func fetchReminders(
       listName: String? = nil,
-      showCompleted: Bool = false
+      showCompleted: Bool = false,
+      startDate: String? = nil,
+      endDate: String? = nil
     ) async throws -> [Reminder] {
       try await permissionService.ensureRemindersAccess()
 
@@ -41,6 +43,14 @@
           // Filter by completion status
           if !showCompleted {
             reminders = reminders.filter { !$0.isCompleted }
+          }
+
+          // Filter by due-date window (startDate inclusive, endDate exclusive)
+          if let startDate, let endDate {
+            reminders = reminders.filter {
+              DateValidator.isWithinDateWindow(
+                $0.dueDate, startDate: startDate, endDate: endDate)
+            }
           }
 
           continuation.resume(returning: reminders)

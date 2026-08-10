@@ -40,7 +40,8 @@
 
     func pushReminders() async throws -> PushResult {
       let encryptor = try requireEncryptor()
-      let reminders = try await reminderService.fetchReminders(showCompleted: true)
+      let reminders = try await reminderService.fetchReminders(
+        showCompleted: true, startDate: nil, endDate: nil)
       return try await SyncEngine.pushSnapshot(
         items: reminders, getId: { $0.id }, store: SyncConfigStore.store,
         defaultState: SyncState(), stateKeyPath: \.reminders,
@@ -120,7 +121,8 @@
 
     func pullReminders() async throws -> PullSummary {
       let encryptor = try requireEncryptor()
-      let localReminders = try await reminderService.fetchReminders(showCompleted: true)
+      let localReminders = try await reminderService.fetchReminders(
+        showCompleted: true, startDate: nil, endDate: nil)
       let localLastModified = lastModifiedIndex(
         localReminders.map {
           (id: $0.id, lastModified: $0.lastModifiedDate, creationDate: $0.creationDate)

@@ -90,14 +90,43 @@ struct ReminderCommands: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Include completed reminders")
     var completed = false
 
+    @Option(
+      name: .shortAndLong,
+      help: "Start of the due-date window (yyyy-MM-dd, inclusive)"
+    )
+    var start: String?
+
+    @Option(
+      name: .shortAndLong,
+      help: "End of the due-date window (yyyy-MM-dd, exclusive)"
+    )
+    var end: String?
+
     @Flag(help: "Output in JSON format")
     var json = false
 
     func run() async throws {
+      // `calendar list` accepts a bare start or end and fills the other side
+      // with a window; here both bounds are required together so a one-sided
+      // query can't silently expand to the whole store. Validate the bounds up
+      // front (throwing on garbage) so a bad window surfaces a clear error
+      // instead of an empty result set.
+      if (start == nil) != (end == nil) {
+        throw EventCLIError.invalidInput(
+          "Use both --start and --end to filter reminders by due date."
+        )
+      }
+      if let start, let end {
+        _ = try Date.validated(dateString: start)
+        _ = try Date.validated(dateString: end)
+      }
+
       let backend = try await BackendFactory.makeRemindersBackend()
       let reminders = try await backend.fetchReminders(
         listName: list,
-        showCompleted: completed
+        showCompleted: completed,
+        startDate: start,
+        endDate: end
       )
 
       let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
@@ -349,7 +378,8 @@ struct ReminderCommands: AsyncParsableCommand {
         )
       #else
         let backend = try await BackendFactory.makeRemindersBackend()
-        let all = try await backend.fetchReminders(listName: list, showCompleted: completed)
+        let all = try await backend.fetchReminders(
+          listName: list, showCompleted: completed, startDate: nil, endDate: nil)
         let lowercased = keyword.lowercased()
         let reminders = all.filter { reminder in
           reminder.title.lowercased().contains(lowercased)

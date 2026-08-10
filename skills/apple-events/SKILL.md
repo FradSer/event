@@ -51,11 +51,12 @@ All commands support the `--json` flag to output results in JSON format, which i
 - Filter by specific list: `event reminders list --list "List Name"`
 - To programmatically check completion, add `--json` and read the `isCompleted` boolean per item — do not `grep "[x]"` on JSON (see [General Usage](#general-usage)).
 - Filter by a due-date window (both bounds required, day-based, end exclusive):
-  `event reminders list --start "2026-08-01" --end "2026-08-31"` — the start day is
-  inclusive and the end day exclusive, matching `calendar list`. Bounds must be
-  date-only `yyyy-MM-dd`; a time component is rejected with an invalid-date error.
-  No `--json` is needed for human-readable output; the
-  default markdown output works without the flag.
+  `event reminders list --start "2026-08-01" --end "2026-09-01"` — the start day is
+  inclusive and the end day exclusive, matching `calendar list`. To include reminders
+  due on a given day, set `--end` to the day AFTER it (e.g. `--end "2026-09-01"`
+  includes reminders through August 31). Bounds must be date-only `yyyy-MM-dd`; a
+  time component is rejected with an invalid-date error. No `--json` is needed for
+  human-readable output; the default markdown output works without the flag.
 - Search by keyword in title and notes: `event reminders search --keyword "groceries"` (also accepts `--list` and `--completed`)
 
 ### Create Reminders

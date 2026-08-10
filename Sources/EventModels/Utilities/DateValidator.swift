@@ -1,3 +1,4 @@
+import AppleSyncKit
 import Foundation
 
 /// Centralized date validation that rejects auto-corrected invalid dates
@@ -140,6 +141,7 @@ public enum DateValidator {
       let date = (try? validateDate(dateString))
         ?? (try? validateDateTime(dateString))
         ?? (try? validateDateTime(dateString.replacingOccurrences(of: "T", with: " ")))
+        ?? ISO8601DateFormatter.syncISO8601.date(from: dateString)
         ?? ISO8601DateFormatter().date(from: dateString)
     else {
       return false

@@ -109,6 +109,42 @@ final class SQLiteReminderServiceTests: XCTestCase {
     XCTAssertTrue(list1Reminders.allSatisfy { $0.list == "List1" })
   }
 
+  // MARK: - Due-Date Window Tests
+
+  func testFetchRemindersByDueWindow() async throws {
+    _ = try await service.createReminder(
+      CreateReminderParams(title: "Inside", dueDate: "2026-08-10 09:00:00", priority: 0))
+    _ = try await service.createReminder(
+      CreateReminderParams(title: "Boundary End", dueDate: "2026-08-24 09:00:00", priority: 0))
+    _ = try await service.createReminder(
+      CreateReminderParams(title: "Outside Start", dueDate: "2026-08-09 23:59:59", priority: 0))
+
+    let inWindow = try await service.fetchReminders(
+      listName: nil, showCompleted: true, startDate: "2026-08-10", endDate: "2026-08-24")
+
+    XCTAssertEqual(inWindow.map(\.title), ["Inside"])
+  }
+
+  func testFetchRemindersByDueWindowDateOnlyShape() async throws {
+    _ = try await service.createReminder(
+      CreateReminderParams(title: "DateOnly", dueDate: "2026-08-15", priority: 0))
+    _ = try await service.createReminder(
+      CreateReminderParams(title: "NoDue", priority: 0))
+
+    let inWindow = try await service.fetchReminders(
+      listName: nil, showCompleted: true, startDate: "2026-08-10", endDate: "2026-08-24")
+
+    XCTAssertEqual(inWindow.map(\.title), ["DateOnly"])
+  }
+
+  func testFetchRemindersNoWindowIgnoresDates() async throws {
+    _ = try await service.createReminder(
+      CreateReminderParams(title: "NoDue", priority: 0))
+
+    let all = try await service.fetchReminders(listName: nil, showCompleted: true)
+    XCTAssertEqual(all.count, 1)
+  }
+
   func testFetchRemindersHideCompleted() async throws {
     let r1 = try await service.createReminder(
       CreateReminderParams(title: "R1", priority: 0))

@@ -18,7 +18,9 @@ public actor SQLiteReminderService: RemindersBackend {
 
   public func fetchReminders(
     listName: String?,
-    showCompleted: Bool
+    showCompleted: Bool,
+    startDate: String? = nil,
+    endDate: String? = nil
   ) async throws -> [Reminder] {
     var sql = "SELECT data FROM reminders WHERE deleted = 0"
     var bindings: [Binding?] = []
@@ -34,9 +36,21 @@ public actor SQLiteReminderService: RemindersBackend {
 
     sql += " ORDER BY updated_at DESC"
 
-    return try connection.prepare(sql, bindings).map { row in
+    var reminders = try connection.prepare(sql, bindings).map { row in
       try Self.decodeReminder(from: row[0])
     }
+
+    // The due date is stored as a formatted string, so bound the window in
+    // Swift (shared with the EventKit and Cloudflare backends) rather than
+    // string-comparing in SQL, which is fragile across the two date shapes.
+    if let startDate, let endDate {
+      reminders = reminders.filter {
+        DateValidator.isWithinDateWindow(
+          $0.dueDate, startDate: startDate, endDate: endDate)
+      }
+    }
+
+    return reminders
   }
 
   public func fetchReminder(byId id: String) async throws -> Reminder {

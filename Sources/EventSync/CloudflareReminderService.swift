@@ -21,7 +21,9 @@ public actor CloudflareReminderService: RemindersBackend {
 
   public func fetchReminders(
     listName: String?,
-    showCompleted: Bool
+    showCompleted: Bool,
+    startDate: String? = nil,
+    endDate: String? = nil
   ) async throws -> [Reminder] {
     let all: [Reminder] = try await client.pullAll(entity: "reminders")
     var filtered = all
@@ -30,6 +32,12 @@ public actor CloudflareReminderService: RemindersBackend {
     }
     if !showCompleted {
       filtered = filtered.filter { !$0.isCompleted }
+    }
+    if let startDate, let endDate {
+      filtered = filtered.filter {
+        DateValidator.isWithinDateWindow(
+          $0.dueDate, startDate: startDate, endDate: endDate)
+      }
     }
     return try await encryptor.decryptReminders(filtered)
   }

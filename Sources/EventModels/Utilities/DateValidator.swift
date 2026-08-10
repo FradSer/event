@@ -121,4 +121,36 @@ public enum DateValidator {
       throw EventCLIError.dateOutOfRange("Date year must be between 1900 and 2100, got: \(year)")
     }
   }
+
+  /// Returns whether a due-date string falls inside the half-open window
+  /// `[startDate, endDate)`. Both bounds are date-only (`yyyy-MM-dd`); the
+  /// start day is inclusive and the end day exclusive, matching `calendar list`.
+  ///
+  /// `dateString` may be `yyyy-MM-dd`, `yyyy-MM-dd HH:mm:ss`, or an ISO 8601
+  /// value (e.g. `yyyy-MM-dd'T'HH:mm:ssZ`) — the shapes `Reminder.dueDate` can
+  /// take across backends. Unparseable strings (or a value with no due date)
+  /// are treated as outside the window so a windowed query never returns a
+  /// reminder it can't bound.
+  public static func isWithinDateWindow(
+    _ dateString: String?,
+    startDate: String,
+    endDate: String
+  ) -> Bool {
+    guard let dateString, !dateString.isEmpty,
+      let date = (try? validateDate(dateString))
+        ?? (try? validateDateTime(dateString))
+        ?? (try? validateDateTime(dateString.replacingOccurrences(of: "T", with: " ")))
+        ?? ISO8601DateFormatter().date(from: dateString)
+    else {
+      return false
+    }
+
+    guard let start = try? validateDate(startDate),
+      let end = try? validateDate(endDate)
+    else {
+      return false
+    }
+
+    return date >= start && date < end
+  }
 }

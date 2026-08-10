@@ -54,6 +54,22 @@
       ]
     },
     {
+      "id": 6,
+      "prompt": "Which reminders are due between 2026-08-01 and 2026-08-31?",
+      "expected_output": "A list of reminders filtered by due date obtained by running `event reminders list --start 2026-08-01 --end 2026-08-31`. Human-readable markdown output; no `--json` needed.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Uses date-window flags",
+          "description": "The command invoked is `event reminders list` with both `--start 2026-08-01` and `--end 2026-08-31` (both bounds supplied together)."
+        },
+        {
+          "name": "Returns valid list",
+          "description": "The output file `reminders.md` exists and contains the reminders due within the window, or a message saying none were found."
+        }
+      ]
+    },
+    {
       "id": 4,
       "prompt": "remind me to call the dentist tomorrow at 3pm",
       "expected_output": "Interprets the free-form instruction and creates a reminder via `event reminders create` with a title about calling the dentist and a `--due` resolved to tomorrow at 15:00:00.",

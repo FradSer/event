@@ -64,4 +64,11 @@ final class DateValidatorWindowTests: XCTestCase {
       DateValidator.isWithinDateWindow(
         "2026-08-15T09:00:00", startDate: "2026-08-10", endDate: "2026-08-24"))
   }
+
+  func testFractionalSecondsIsoDueDateInsideWindow() {
+    // Matches the project's syncISO8601 format (fractional seconds).
+    XCTAssertTrue(
+      DateValidator.isWithinDateWindow(
+        "2026-08-11T15:30:00.123Z", startDate: "2026-08-10", endDate: "2026-08-24"))
+  }
 }

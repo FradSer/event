@@ -27,5 +27,5 @@ Feature: Query reminders by a due-date window
     Then no reminders are returned
 
   Scenario: Invalid start date is rejected
-    When I list reminders with --start "2026-13-99"
+    When I list reminders with --start "2026-13-99" --end "2026-08-24"
     Then the command fails with an invalid-date error

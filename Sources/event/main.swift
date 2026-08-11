@@ -7,7 +7,7 @@ struct EventCLI: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "event",
     abstract: "CLI tool for managing Apple Reminders and Calendar on macOS",
-    version: "0.3.0",
+    version: "0.6.0",
     subcommands: [
       ReminderCommands.self,
       CalendarCommands.self,

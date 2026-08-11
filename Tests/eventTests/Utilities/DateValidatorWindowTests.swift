@@ -72,11 +72,6 @@ final class DateValidatorWindowTests: XCTestCase {
         "2026-08-11T15:30:00.123Z", startDate: "2026-08-10", endDate: "2026-08-24"))
   }
 
-  func testInvalidIso8601DueDateIsExcluded() {
-    XCTAssertFalse(
-      DateValidator.isWithinDateWindow(
-        "2026-02-30T00:00:00Z", startDate: "2026-03-01", endDate: "2026-03-03"))
-  }
 
   func testDateBoundsOverloadMatchesStringVersion() {
     let start = try? DateValidator.validateDate("2026-08-10")

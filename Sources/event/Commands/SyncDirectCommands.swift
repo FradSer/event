@@ -81,8 +81,11 @@ struct SyncRemindersCommands: AsyncParsableCommand {
         )
       }
       if let start, let end {
-        _ = try Date.validated(dateString: start)
-        _ = try Date.validated(dateString: end)
+        let startDate = try Date.validated(dateString: start)
+        let endDate = try Date.validated(dateString: end)
+        // An inverted window would silently return an empty list; error up
+        // front instead. Equal bounds are allowed (half-open, end-exclusive).
+        try DateValidator.validateDateRange(start: startDate, end: endDate)
       }
 
       let reminders = try await DirectAccess.withReminderService {

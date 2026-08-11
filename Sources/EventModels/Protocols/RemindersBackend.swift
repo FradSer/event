@@ -3,7 +3,12 @@ import Foundation
 // MARK: - Reminders Backend Protocol
 
 public protocol RemindersBackend: Sendable {
-  func fetchReminders(listName: String?, showCompleted: Bool) async throws -> [Reminder]
+  func fetchReminders(
+    listName: String?,
+    showCompleted: Bool,
+    startDate: String?,
+    endDate: String?
+  ) async throws -> [Reminder]
   func fetchReminder(byId id: String) async throws -> Reminder
   func createReminder(_ params: CreateReminderParams) async throws -> Reminder
   func updateReminder(id: String, params: UpdateReminderParams) async throws -> Reminder

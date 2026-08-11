@@ -59,12 +59,38 @@ struct SyncRemindersCommands: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Include completed reminders")
     var completed = false
 
+    @Option(
+      name: .shortAndLong,
+      help: "Start of the due-date window (yyyy-MM-dd, inclusive)"
+    )
+    var start: String?
+
+    @Option(
+      name: .shortAndLong,
+      help: "End of the due-date window (yyyy-MM-dd, exclusive)"
+    )
+    var end: String?
+
     @Flag(help: "Output in JSON format")
     var json = false
 
     func run() async throws {
+      if (start == nil) != (end == nil) {
+        throw EventCLIError.invalidInput(
+          "Use both --start and --end to filter reminders by due date."
+        )
+      }
+      if let start, let end {
+        let startDate = try Date.validated(dateString: start)
+        let endDate = try Date.validated(dateString: end)
+        // An inverted window would silently return an empty list; error up
+        // front instead. Equal bounds are allowed (half-open, end-exclusive).
+        try DateValidator.validateDateRange(start: startDate, end: endDate)
+      }
+
       let reminders = try await DirectAccess.withReminderService {
-        try await $0.fetchReminders(listName: list, showCompleted: completed)
+        try await $0.fetchReminders(
+          listName: list, showCompleted: completed, startDate: start, endDate: end)
       }
       print(DirectAccess.formatter(json: json).format(reminders))
     }

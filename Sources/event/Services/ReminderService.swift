@@ -13,7 +13,9 @@
     /// Fetch reminders with optional filters
     func fetchReminders(
       listName: String? = nil,
-      showCompleted: Bool = false
+      showCompleted: Bool = false,
+      startDate: String? = nil,
+      endDate: String? = nil
     ) async throws -> [Reminder] {
       try await permissionService.ensureRemindersAccess()
 
@@ -26,6 +28,15 @@
       } else {
         calendars = eventStore.calendars(for: .reminder)
       }
+
+      // Parse the window bounds once before the fetch so a large store isn't
+      // re-parsing two constant strings per item, and so an unparseable bound
+      // throws (rather than silently returning the whole store) — but outside
+      // the non-throwing EventKit completion closure.
+      let parsedWindow = try DateValidator.validatedDateWindow(
+        startDate: startDate,
+        endDate: endDate
+      )
 
       let predicate = eventStore.predicateForReminders(in: calendars)
 
@@ -41,6 +52,13 @@
           // Filter by completion status
           if !showCompleted {
             reminders = reminders.filter { !$0.isCompleted }
+          }
+
+          // Filter by due-date window (startDate inclusive, endDate exclusive).
+          if let parsedWindow {
+            reminders = reminders.filter {
+              DateValidator.isWithinDateWindow($0.dueDate, start: parsedWindow.start, end: parsedWindow.end)
+            }
           }
 
           continuation.resume(returning: reminders)

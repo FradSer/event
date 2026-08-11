@@ -44,10 +44,11 @@ public actor SQLiteReminderService: RemindersBackend {
     // Swift (shared with the EventKit and Cloudflare backends) rather than
     // string-comparing in SQL, which is fragile across the two date shapes.
     // Parse the bounds once so a large store isn't re-parsing them per item.
-    if let startDate, let endDate,
-      let start = try? DateValidator.validateDate(startDate),
-      let end = try? DateValidator.validateDate(endDate)
-    {
+    // Throw on unparseable bounds (rather than skipping the filter) so a
+    // windowed query never silently returns the whole store.
+    if let startDate, let endDate {
+      let start = try DateValidator.validateDate(startDate)
+      let end = try DateValidator.validateDate(endDate)
       reminders = reminders.filter {
         DateValidator.isWithinDateWindow($0.dueDate, start: start, end: end)
       }

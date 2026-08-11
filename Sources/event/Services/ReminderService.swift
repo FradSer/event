@@ -29,6 +29,20 @@
         calendars = eventStore.calendars(for: .reminder)
       }
 
+      // Parse the window bounds once before the fetch so a large store isn't
+      // re-parsing two constant strings per item, and so an unparseable bound
+      // throws (rather than silently returning the whole store) — but outside
+      // the non-throwing EventKit completion closure.
+      let parsedWindow: (start: Date, end: Date)?
+      if let startDate, let endDate {
+        parsedWindow = (
+          try DateValidator.validateDate(startDate),
+          try DateValidator.validateDate(endDate)
+        )
+      } else {
+        parsedWindow = nil
+      }
+
       let predicate = eventStore.predicateForReminders(in: calendars)
 
       return try await withCheckedThrowingContinuation { continuation in
@@ -46,13 +60,9 @@
           }
 
           // Filter by due-date window (startDate inclusive, endDate exclusive).
-          // Parse the bounds once so a large store isn't re-parsing them per item.
-          if let startDate, let endDate,
-            let start = try? DateValidator.validateDate(startDate),
-            let end = try? DateValidator.validateDate(endDate)
-          {
+          if let parsedWindow {
             reminders = reminders.filter {
-              DateValidator.isWithinDateWindow($0.dueDate, start: start, end: end)
+              DateValidator.isWithinDateWindow($0.dueDate, start: parsedWindow.start, end: parsedWindow.end)
             }
           }
 

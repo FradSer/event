@@ -71,4 +71,33 @@ final class DateValidatorWindowTests: XCTestCase {
       DateValidator.isWithinDateWindow(
         "2026-08-11T15:30:00.123Z", startDate: "2026-08-10", endDate: "2026-08-24"))
   }
+
+  func testInvalidIso8601DueDateIsExcluded() {
+    XCTAssertFalse(
+      DateValidator.isWithinDateWindow(
+        "2026-02-30T00:00:00Z", startDate: "2026-03-01", endDate: "2026-03-03"))
+  }
+
+  func testDateBoundsOverloadMatchesStringVersion() {
+    let start = try? DateValidator.validateDate("2026-08-10")
+    let end = try? DateValidator.validateDate("2026-08-24")
+    guard let start, let end else {
+      return XCTFail("Failed to parse bounds")
+    }
+
+    XCTAssertTrue(
+      DateValidator.isWithinDateWindow("2026-08-11 09:00:00", start: start, end: end))
+    XCTAssertFalse(
+      DateValidator.isWithinDateWindow("2026-08-24 00:00:00", start: start, end: end))
+  }
+
+  func testInvertedWindowRejectedByValidateDateRange() {
+    let start = try? DateValidator.validateDate("2026-08-24")
+    let end = try? DateValidator.validateDate("2026-08-10")
+    guard let start, let end else {
+      return XCTFail("Failed to parse bounds")
+    }
+
+    XCTAssertThrowsError(try DateValidator.validateDateRange(start: start, end: end))
+  }
 }

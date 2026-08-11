@@ -45,11 +45,14 @@
             reminders = reminders.filter { !$0.isCompleted }
           }
 
-          // Filter by due-date window (startDate inclusive, endDate exclusive)
-          if let startDate, let endDate {
+          // Filter by due-date window (startDate inclusive, endDate exclusive).
+          // Parse the bounds once so a large store isn't re-parsing them per item.
+          if let startDate, let endDate,
+            let start = try? DateValidator.validateDate(startDate),
+            let end = try? DateValidator.validateDate(endDate)
+          {
             reminders = reminders.filter {
-              DateValidator.isWithinDateWindow(
-                $0.dueDate, startDate: startDate, endDate: endDate)
+              DateValidator.isWithinDateWindow($0.dueDate, start: start, end: end)
             }
           }
 

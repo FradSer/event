@@ -155,4 +155,27 @@ public enum DateValidator {
 
     return date >= start && date < end
   }
+
+  /// Returns whether a due-date string falls inside a half-open window whose
+  /// bounds have already been parsed to `Date`. Callers that validate the
+  /// bounds once (e.g. a CLI entry point) should pass the parsed dates here so
+  /// a windowed scan over a large store does not re-parse the same two bounds
+  /// for every item.
+  public static func isWithinDateWindow(
+    _ dateString: String?,
+    start: Date,
+    end: Date
+  ) -> Bool {
+    guard let dateString, !dateString.isEmpty,
+      let date = (try? validateDate(dateString))
+        ?? (try? validateDateTime(dateString))
+        ?? (try? validateDateTime(dateString.replacingOccurrences(of: "T", with: " ")))
+        ?? ISO8601DateFormatter.syncISO8601.date(from: dateString)
+        ?? ISO8601DateFormatter().date(from: dateString)
+    else {
+      return false
+    }
+
+    return date >= start && date < end
+  }
 }

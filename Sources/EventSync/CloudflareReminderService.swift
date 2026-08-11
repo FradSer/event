@@ -33,10 +33,12 @@ public actor CloudflareReminderService: RemindersBackend {
     if !showCompleted {
       filtered = filtered.filter { !$0.isCompleted }
     }
-    if let startDate, let endDate {
+    if let startDate, let endDate,
+      let start = try? DateValidator.validateDate(startDate),
+      let end = try? DateValidator.validateDate(endDate)
+    {
       filtered = filtered.filter {
-        DateValidator.isWithinDateWindow(
-          $0.dueDate, startDate: startDate, endDate: endDate)
+        DateValidator.isWithinDateWindow($0.dueDate, start: start, end: end)
       }
     }
     return try await encryptor.decryptReminders(filtered)

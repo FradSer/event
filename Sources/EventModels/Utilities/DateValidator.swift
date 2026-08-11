@@ -105,7 +105,7 @@ public enum DateValidator {
       )
     }
 
-    try validateReasonableDate(date, timeZone: .gmt)
+    try validateReasonableDate(date, timeZone: .current)
     return date
   }
 

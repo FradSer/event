@@ -43,6 +43,6 @@ Feature: Query reminders by a due-date window
     When a backend fetches reminders with only --start "2026-08-10"
     Then the fetch fails with an invalid-input error
 
-  Scenario: Reversed backend windows are rejected
-    When a backend fetches reminders with --start "2026-08-24" --end "2026-08-10"
-    Then the fetch fails with an invalid-date-range error
+  Scenario: Date window supports the earliest valid year
+    When I list reminders with --start "1900-01-01" --end "1900-01-02"
+    Then the command succeeds

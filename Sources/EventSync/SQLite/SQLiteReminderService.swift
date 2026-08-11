@@ -22,6 +22,7 @@ public actor SQLiteReminderService: RemindersBackend {
     startDate: String? = nil,
     endDate: String? = nil
   ) async throws -> [Reminder] {
+    let parsedWindow = try DateValidator.validatedDateWindow(startDate: startDate, endDate: endDate)
     var sql = "SELECT data FROM reminders WHERE deleted = 0"
     var bindings: [Binding?] = []
 
@@ -46,11 +47,10 @@ public actor SQLiteReminderService: RemindersBackend {
     // Parse the bounds once so a large store isn't re-parsing them per item.
     // Throw on unparseable bounds (rather than skipping the filter) so a
     // windowed query never silently returns the whole store.
-    if let startDate, let endDate {
-      let start = try DateValidator.validateDate(startDate)
-      let end = try DateValidator.validateDate(endDate)
+    if let parsedWindow {
       reminders = reminders.filter {
-        DateValidator.isWithinDateWindow($0.dueDate, start: start, end: end)
+        DateValidator.isWithinDateWindow(
+          $0.dueDate, start: parsedWindow.start, end: parsedWindow.end)
       }
     }
 

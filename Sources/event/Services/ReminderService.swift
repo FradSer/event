@@ -33,15 +33,10 @@
       // re-parsing two constant strings per item, and so an unparseable bound
       // throws (rather than silently returning the whole store) — but outside
       // the non-throwing EventKit completion closure.
-      let parsedWindow: (start: Date, end: Date)?
-      if let startDate, let endDate {
-        parsedWindow = (
-          try DateValidator.validateDate(startDate),
-          try DateValidator.validateDate(endDate)
-        )
-      } else {
-        parsedWindow = nil
-      }
+      let parsedWindow = try DateValidator.validatedDateWindow(
+        startDate: startDate,
+        endDate: endDate
+      )
 
       let predicate = eventStore.predicateForReminders(in: calendars)
 

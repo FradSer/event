@@ -3,6 +3,34 @@ import Foundation
 
 /// Centralized date validation that rejects auto-corrected invalid dates
 public enum DateValidator {
+  private static func parseStrictISO8601(_ string: String) -> Date? {
+    let pattern = #"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})$"#
+    guard string.range(of: pattern, options: .regularExpression) != nil,
+      let hour = Int(string.dropFirst(11).prefix(2)),
+      let minute = Int(string.dropFirst(14).prefix(2)),
+      let second = Int(string.dropFirst(17).prefix(2)), hour < 24, minute < 60,
+      second < 60,
+      (try? validateDate(String(string.prefix(10)))) != nil
+    else {
+      return nil
+    }
+
+    if !string.hasSuffix("Z") {
+      let offset = string.suffix(6)
+      guard let offsetHour = Int(offset.prefix(3).dropFirst()),
+        let offsetMinute = Int(offset.suffix(2)), offsetHour < 24, offsetMinute < 60
+      else {
+        return nil
+      }
+    }
+
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = string.contains(".")
+      ? [.withInternetDateTime, .withFractionalSeconds]
+      : [.withInternetDateTime]
+    return formatter.date(from: string)
+  }
+
   /// Validates datetime string in format "yyyy-MM-dd HH:mm:ss"
   /// Rejects auto-corrected dates (e.g., Feb 30 -> Mar 2)
   public static func validateDateTime(
@@ -13,6 +41,7 @@ public enum DateValidator {
     formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
     formatter.timeZone = timeZone
     formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.calendar = Calendar(identifier: .gregorian)
 
     guard let date = formatter.date(from: string) else {
       throw EventCLIError.invalidDate(
@@ -62,6 +91,7 @@ public enum DateValidator {
     formatter.dateFormat = "yyyy-MM-dd"
     formatter.timeZone = TimeZone.current
     formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.calendar = Calendar(identifier: .gregorian)
 
     guard let date = formatter.date(from: string) else {
       throw EventCLIError.invalidDate("Invalid date format. Expected yyyy-MM-dd, got: \(string)")
@@ -75,7 +105,7 @@ public enum DateValidator {
       )
     }
 
-    try validateReasonableDate(date, timeZone: .current)
+    try validateReasonableDate(date, timeZone: .gmt)
     return date
   }
 
@@ -110,7 +140,7 @@ public enum DateValidator {
     _ date: Date,
     timeZone: TimeZone = .current
   ) throws {
-    var calendar = Calendar.current
+    var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = timeZone
     let components = calendar.dateComponents([.year], from: date)
 
@@ -123,9 +153,25 @@ public enum DateValidator {
     }
   }
 
-  /// Returns whether a due-date string falls inside the half-open window
-  /// `[startDate, endDate)`. Both bounds are date-only (`yyyy-MM-dd`); the
-  /// start day is inclusive and the end day exclusive, matching `calendar list`.
+  public static func validatedDateWindow(
+    startDate: String?,
+    endDate: String?
+  ) throws -> (start: Date, end: Date)? {
+    guard let startDate, let endDate else {
+      guard startDate == nil, endDate == nil else {
+        throw EventCLIError.invalidInput(
+          "Use both start and end dates to filter reminders by due date."
+        )
+      }
+      return nil
+    }
+
+    let start = try validateDate(startDate)
+    let end = try validateDate(endDate)
+    try validateDateRange(start: start, end: end)
+    return (start, end)
+  }
+
   ///
   /// `dateString` may be `yyyy-MM-dd`, `yyyy-MM-dd HH:mm:ss`, or an ISO 8601
   /// value (e.g. `yyyy-MM-dd'T'HH:mm:ssZ`) — the shapes `Reminder.dueDate` can
@@ -141,8 +187,7 @@ public enum DateValidator {
       let date = (try? validateDate(dateString))
         ?? (try? validateDateTime(dateString))
         ?? (try? validateDateTime(dateString.replacingOccurrences(of: "T", with: " ")))
-        ?? ISO8601DateFormatter.syncISO8601.date(from: dateString)
-        ?? ISO8601DateFormatter().date(from: dateString)
+        ?? parseStrictISO8601(dateString)
     else {
       return false
     }
@@ -170,8 +215,7 @@ public enum DateValidator {
       let date = (try? validateDate(dateString))
         ?? (try? validateDateTime(dateString))
         ?? (try? validateDateTime(dateString.replacingOccurrences(of: "T", with: " ")))
-        ?? ISO8601DateFormatter.syncISO8601.date(from: dateString)
-        ?? ISO8601DateFormatter().date(from: dateString)
+        ?? parseStrictISO8601(dateString)
     else {
       return false
     }

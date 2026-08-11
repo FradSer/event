@@ -33,3 +33,16 @@ Feature: Query reminders by a due-date window
   Scenario: Reversed date window is rejected
     When I list reminders with --start "2026-08-24" --end "2026-08-10"
     Then the command fails with an invalid-date-range error
+
+  Scenario: Invalid ISO due dates are excluded
+    Given a reminder due on "2026-02-30T00:00:00Z"
+    When I list reminders with --start "2026-03-01" --end "2026-03-03"
+    Then no reminders are returned
+
+  Scenario: One-sided backend windows are rejected
+    When a backend fetches reminders with only --start "2026-08-10"
+    Then the fetch fails with an invalid-input error
+
+  Scenario: Reversed backend windows are rejected
+    When a backend fetches reminders with --start "2026-08-24" --end "2026-08-10"
+    Then the fetch fails with an invalid-date-range error

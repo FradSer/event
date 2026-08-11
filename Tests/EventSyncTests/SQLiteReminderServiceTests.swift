@@ -137,6 +137,32 @@ final class SQLiteReminderServiceTests: XCTestCase {
     XCTAssertEqual(inWindow.map(\.title), ["DateOnly"])
   }
 
+  func testFetchRemindersRejectsOneSidedDueWindow() async throws {
+    do {
+      _ = try await service.fetchReminders(
+        listName: nil, showCompleted: true, startDate: "2026-08-10", endDate: nil)
+      XCTFail("Expected invalidInput error")
+    } catch let error as EventCLIError {
+      guard case .invalidInput = error else {
+        XCTFail("Expected invalidInput error, got: \(error)")
+        return
+      }
+    }
+  }
+
+  func testFetchRemindersRejectsInvertedDueWindow() async throws {
+    do {
+      _ = try await service.fetchReminders(
+        listName: nil, showCompleted: true, startDate: "2026-08-24", endDate: "2026-08-10")
+      XCTFail("Expected invalidDateRange error")
+    } catch let error as EventCLIError {
+      guard case .invalidDateRange = error else {
+        XCTFail("Expected invalidDateRange error, got: \(error)")
+        return
+      }
+    }
+  }
+
   func testFetchRemindersNoWindowIgnoresDates() async throws {
     _ = try await service.createReminder(
       CreateReminderParams(title: "NoDue", priority: 0))

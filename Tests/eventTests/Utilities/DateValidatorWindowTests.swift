@@ -86,6 +86,12 @@ final class DateValidatorWindowTests: XCTestCase {
       DateValidator.isWithinDateWindow("2026-08-24 00:00:00", start: start, end: end))
   }
 
+  func testInvalidIso8601DueDateIsExcluded() {
+    XCTAssertFalse(
+      DateValidator.isWithinDateWindow(
+        "2026-02-30T00:00:00Z", startDate: "2026-03-01", endDate: "2026-03-03"))
+  }
+
   func testInvertedWindowRejectedByValidateDateRange() {
     let start = try? DateValidator.validateDate("2026-08-24")
     let end = try? DateValidator.validateDate("2026-08-10")
@@ -94,5 +100,28 @@ final class DateValidatorWindowTests: XCTestCase {
     }
 
     XCTAssertThrowsError(try DateValidator.validateDateRange(start: start, end: end))
+  }
+
+  func testValidatedDateWindowRejectsOneSidedBounds() {
+    XCTAssertThrowsError(
+      try DateValidator.validatedDateWindow(startDate: "2026-08-10", endDate: nil)
+    ) { error in
+      guard case EventCLIError.invalidInput = error else {
+        XCTFail("Expected invalidInput error, got: \(error)")
+        return
+      }
+    }
+  }
+
+  func testValidatedDateWindowRejectsInvertedBounds() {
+    XCTAssertThrowsError(
+      try DateValidator.validatedDateWindow(
+        startDate: "2026-08-24", endDate: "2026-08-10")
+    ) { error in
+      guard case EventCLIError.invalidDateRange = error else {
+        XCTFail("Expected invalidDateRange error, got: \(error)")
+        return
+      }
+    }
   }
 }

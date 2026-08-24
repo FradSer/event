@@ -291,6 +291,21 @@
       }
     }
 
+    /// Build the DateComponents for a reminder due/start date.
+    ///
+    /// A date-only string ("yyyy-MM-dd") produces components without hour and minute,
+    /// which is how EventKit represents an all-day reminder. Reminders.app then shows
+    /// the day without a time. Anything else keeps the time component.
+    static func reminderDateComponents(from dateString: String) throws -> DateComponents {
+      if Date.isAllDayFormat(dateString) {
+        let date = try Date.validated(dateString: dateString)
+        return DateComponentsBuilder.buildAllDay(from: date, timeZone: .current)
+      }
+
+      let date = try Date.validated(dateTimeString: dateString)
+      return DateComponentsBuilder.build(from: date, timeZone: .current)
+    }
+
     /// Create reminder via EventKit (basic properties only)
     private func createViaEventKit(
       title: String,
@@ -326,9 +341,7 @@
 
       // Set due date
       if let dueDateString = dueDate {
-        let date = try Date.validated(dateTimeString: dueDateString)
-        let components = DateComponentsBuilder.build(from: date, timeZone: .current)
-        ekReminder.dueDateComponents = components
+        ekReminder.dueDateComponents = try Self.reminderDateComponents(from: dueDateString)
       }
 
       // Set priority
@@ -383,17 +396,13 @@
       if clearDue {
         ekReminder.dueDateComponents = nil
       } else if let dueDateString = dueDate {
-        let date = try Date.validated(dateTimeString: dueDateString)
-        let components = DateComponentsBuilder.build(from: date, timeZone: .current)
-        ekReminder.dueDateComponents = components
+        ekReminder.dueDateComponents = try Self.reminderDateComponents(from: dueDateString)
       }
 
       if clearStart {
         ekReminder.startDateComponents = nil
       } else if let startDateString = startDate {
-        let date = try Date.validated(dateTimeString: startDateString)
-        let components = DateComponentsBuilder.build(from: date, timeZone: .current)
-        ekReminder.startDateComponents = components
+        ekReminder.startDateComponents = try Self.reminderDateComponents(from: startDateString)
       }
 
       if let priority = priority {

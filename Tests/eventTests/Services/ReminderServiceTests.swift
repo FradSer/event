@@ -88,5 +88,61 @@
       XCTAssertNil(remaining.first?.structuredLocation)
       XCTAssertEqual(remaining.first?.relativeOffset, -300)
     }
+
+    // MARK: - reminderDateComponents
+
+    func testDateOnlyDueDateProducesAllDayComponents() throws {
+      // A date without a time is EventKit's all-day representation: no hour, no minute.
+      let components = try ReminderService.reminderDateComponents(from: "2026-08-26")
+
+      XCTAssertEqual(components.year, 2026)
+      XCTAssertEqual(components.month, 8)
+      XCTAssertEqual(components.day, 26)
+      XCTAssertNil(components.hour)
+      XCTAssertNil(components.minute)
+    }
+
+    func testDateTimeDueDateKeepsTimeComponents() throws {
+      let components = try ReminderService.reminderDateComponents(from: "2026-08-26 14:30:00")
+
+      XCTAssertEqual(components.year, 2026)
+      XCTAssertEqual(components.month, 8)
+      XCTAssertEqual(components.day, 26)
+      XCTAssertEqual(components.hour, 14)
+      XCTAssertEqual(components.minute, 30)
+    }
+
+    func testMidnightDueDateStaysTimed() throws {
+      // "00:00:00" is an explicit time, so it must not collapse into an all-day reminder.
+      let components = try ReminderService.reminderDateComponents(from: "2026-08-26 00:00:00")
+
+      XCTAssertEqual(components.hour, 0)
+      XCTAssertEqual(components.minute, 0)
+    }
+
+    func testInvalidDueDateThrows() {
+      XCTAssertThrowsError(try ReminderService.reminderDateComponents(from: "26.08.2026"))
+    }
+
+    // MARK: - Reminder mapping
+
+    func testAllDayReminderIsReadBackAsDateOnly() {
+      let reminder = makeReminder(title: "All-day")
+      reminder.dueDateComponents = DateComponents(year: 2026, month: 8, day: 26)
+
+      let mapped = Reminder(from: reminder)
+
+      XCTAssertEqual(mapped.dueDate, "2026-08-26")
+    }
+
+    func testTimedReminderIsReadBackWithTime() {
+      let reminder = makeReminder(title: "Timed")
+      reminder.dueDateComponents = DateComponents(
+        year: 2026, month: 8, day: 26, hour: 14, minute: 30)
+
+      let mapped = Reminder(from: reminder)
+
+      XCTAssertEqual(mapped.dueDate, "2026-08-26 14:30:00")
+    }
   }
 #endif

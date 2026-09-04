@@ -14,7 +14,7 @@ let package = Package(
     .package(
       url: "https://github.com/stephencelis/SQLite.swift", from: "0.15.3",
       traits: ["SQLiteSwiftCSQLite"]),
-    .package(url: "git@github.com:FradSer/apple-sync-kit.git", from: "0.4.0"),
+    .package(path: "../apple-sync-kit"),
   ],
   targets: [
     .target(

@@ -63,7 +63,7 @@ encrypted Cloudflare D1 cloud sync built on the shared `AppleSyncKit` package.
 
 Dependencies flow inward: Commands -> Services -> EventKit. The `event` executable requires the `-parse-as-library` compiler flag (set in Package.swift) for ArgumentParser `@main`.
 
-**AppleSyncKit**: Sync primitives — `D1SyncClient`, `SyncEngine` (snapshot strategy), `ConfigStore`, `EncryptionService` — live in the sibling local package `../apple-sync-kit` (`AppleSyncKit` product), referenced via `.package(path:)`. Swift tools 6.2, language mode `.v6`.
+**AppleSyncKit**: Sync primitives — `D1SyncClient`, `SyncCoordinator`, `LocalSyncSource`, `SyncStateJournal`, `ConfigStore`, `EncryptionService` — live in the sibling local package `../apple-sync-kit` (`AppleSyncKit` product), referenced via `.package(path:)`. Swift tools 6.2, language mode `.v6`.
 
 ### Key Architectural Decisions
 
@@ -87,11 +87,11 @@ Custom `EventCLIError` enum provides structured errors: `permissionDenied`, `not
 
 ### Sync Architecture
 
-`SyncService` (macOS) and `LinuxSyncService` orchestrate push/pull/delete, delegating the algorithm to `AppleSyncKit.SyncEngine` (`pushSnapshot`/`pushLocalOnly`/`pull`) over `D1SyncClient`. Pull order: lists -> reminders -> calendar events (dependency order). Bare `event sync` is `SyncCommands.FullSync` (the `defaultSubcommand`): a full sync that pulls then pushes; `push`/`pull` remain as one-directional subcommands.
+`SyncService` (macOS) and `LinuxSyncService` adapt EventKit/SQLite through `LocalSyncSource` and delegate the algorithm to `AppleSyncKit.SyncCoordinator`. Pull order: lists -> reminders -> calendar events (dependency order). Bare `event sync` is `SyncCommands.FullSync` (the `defaultSubcommand`): a full sync that pulls then pushes; `push`/`pull` remain as one-directional subcommands.
 
 **Encryption (mandatory)**: Reminders and calendar events are end-to-end encrypted; lists are not (no sensitive data). `EventEncryptor.fromEnvironment()` builds an AES-GCM encryptor from `EVENT_ENCRYPTION_KEY` (base64-encoded 32-byte key; generate with `openssl rand -base64 32`, identical on every device). On push, sensitive fields (notes, URL, location, alarms, recurrence, attendees) are sealed into an `EncryptedCarrier` (`{p: ciphertext, i: iv}`) stored in the `notes` field; title/list/dates stay plaintext for search. On pull they are decrypted back. Local EventKit/SQLite always holds plaintext; the Worker's `data` column stores the ciphertext blob. Push/pull of reminders/events throws if the key is unset. The same key is required by the `event sync reminders/calendar` direct-D1 commands.
 
-**Config storage**: `SyncConfigStore.load()` reads connection settings from environment variables first (`EVENT_SYNC_API_URL`, `EVENT_SYNC_API_TOKEN`, optional `EVENT_SYNC_DEVICE_ID` which defaults to the hostname), falling back to `~/.config/event-sync/config.json` (written by `event sync config`). Setting exactly one of the two required env vars is an error. Sync state always lives in `~/.config/event-sync/` with an exclusive file lock (`.lock`): `cursors.json`, `id-mapping.json` (local<->remote), `state.json` — all mode `0o600`. API URL must be HTTPS.
+**Config storage**: `SyncConfigStore.load()` reads connection settings from environment variables first (`EVENT_SYNC_API_URL`, `EVENT_SYNC_API_TOKEN`, optional `EVENT_SYNC_DEVICE_ID` which defaults to the hostname), falling back to `~/.config/event-sync/config.json` (written by `event sync config`). Setting exactly one of the two required env vars is an error. Sync state lives in the atomic `~/.config/event-sync/sync-state.json` journal with an exclusive file lock (`.lock`); both files use mode `0o600`. API URL must be HTTPS.
 
 **Worker** (`skills/apple-events/references/worker/`): Hono framework on Cloudflare Workers with D1 database. Endpoints at `/api/v1/{entity}/{operation}` for push (POST), pull (GET with cursor pagination), delete (DELETE, soft-delete). Pull accepts a `device` query param so a device never pulls back its own writes. Auth via `API_TOKEN` secret (Bearer token). `wrangler.toml` needs actual `database_id`. Schema lives in `skills/apple-events/references/worker/migrations/` (numbered files applied via `wrangler d1 migrations apply`); a daily cron trigger purges records soft-deleted over 30 days ago. The Worker is bundled inside the `apple-events` skill so it ships with `npx skills add`.
 

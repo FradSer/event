@@ -188,6 +188,8 @@ event sync pull --type calendar # pull only, one entity type
 > ahead; events outside this window are not synced. Conflicts resolve by
 > last-write-wins: a pull never overwrites a local copy that was modified more
 > recently than the server's version, and that copy is pushed on the next sync.
+> All entity cursors, ID mappings, and snapshots are checkpointed atomically in
+> `~/.config/event-sync/sync-state.json`.
 
 For more commands, run `event --help`.
 

@@ -27,9 +27,13 @@ public actor CloudflareListService: ListsBackend {
   }
 
   public func deleteList(id: String) async throws {
-    try await client.delete(
+    let result = try await client.delete(
       entity: "reminder_lists", id: id,
       lastModified: ISO8601DateFormatter.syncISO8601.string(from: Date()))
+    guard result.accepted else {
+      throw SyncError.unknown(
+        "Reminder list deletion was rejected by last-write-wins conflict resolution")
+    }
   }
 
   public func updateList(id: String, title: String?, color: String?) async throws -> ReminderList {

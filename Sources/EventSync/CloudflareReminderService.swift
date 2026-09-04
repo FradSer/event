@@ -130,8 +130,12 @@ public actor CloudflareReminderService: RemindersBackend {
   // MARK: - Delete
 
   public func deleteReminder(id: String) async throws {
-    try await client.delete(
+    let result = try await client.delete(
       entity: "reminders", id: id,
       lastModified: ISO8601DateFormatter.syncISO8601.string(from: Date()))
+    guard result.accepted else {
+      throw SyncError.unknown(
+        "Reminder deletion was rejected by last-write-wins conflict resolution")
+    }
   }
 }

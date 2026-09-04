@@ -103,8 +103,9 @@ public actor CloudflareCalendarService: CalendarBackend {
     if let startDateInput = params.startDate {
       startDate = startDateInput
     } else if let timeZone, !isAllDay, existing.usesEventTimeZoneDateFormat {
-      startDate = (try? DateValidator.convertDateTime(
-        existing.startDate, from: existingTimeZone, to: timeZone)) ?? existing.startDate
+      startDate =
+        (try? DateValidator.convertDateTime(
+          existing.startDate, from: existingTimeZone, to: timeZone)) ?? existing.startDate
     } else {
       startDate = existing.startDate
     }
@@ -112,8 +113,9 @@ public actor CloudflareCalendarService: CalendarBackend {
     if let endDateInput = params.endDate {
       endDate = endDateInput
     } else if let timeZone, !isAllDay, existing.usesEventTimeZoneDateFormat {
-      endDate = (try? DateValidator.convertDateTime(
-        existing.endDate, from: existingTimeZone, to: timeZone)) ?? existing.endDate
+      endDate =
+        (try? DateValidator.convertDateTime(
+          existing.endDate, from: existingTimeZone, to: timeZone)) ?? existing.endDate
     } else {
       endDate = existing.endDate
     }
@@ -148,9 +150,13 @@ public actor CloudflareCalendarService: CalendarBackend {
   // MARK: - Delete
 
   public func deleteEvent(id: String) async throws {
-    try await client.delete(
+    let result = try await client.delete(
       entity: "calendar_events", id: id,
       lastModified: ISO8601DateFormatter.syncISO8601.string(from: Date()))
+    guard result.accepted else {
+      throw SyncError.unknown(
+        "Calendar event deletion was rejected by last-write-wins conflict resolution")
+    }
   }
 
 }

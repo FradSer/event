@@ -41,7 +41,7 @@ public struct SyncStatusCommand: AsyncParsableCommand {
 
   public func run() async throws {
     let config = try SyncConfigStore.load()
-    let cursors = SyncConfigStore.loadCursors()
+    let cursors = try SyncConfigStore.loadJournal().cursors
 
     let source =
       SyncConfigStore.hasEnvironmentConfig()
@@ -52,8 +52,8 @@ public struct SyncStatusCommand: AsyncParsableCommand {
     print("Token: \(String(config.apiToken.prefix(4)))...")
     print("")
     print("Last sync cursors:")
-    print("  Reminders:       \(cursors.reminders ?? "never")")
-    print("  Calendar events: \(cursors.calendarEvents ?? "never")")
-    print("  Reminder lists:  \(cursors.reminderLists ?? "never")")
+    print("  Reminders:       \(cursors["reminders"] ?? "never")")
+    print("  Calendar events: \(cursors["calendar_events"] ?? "never")")
+    print("  Reminder lists:  \(cursors["reminder_lists"] ?? "never")")
   }
 }

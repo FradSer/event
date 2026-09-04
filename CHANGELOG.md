@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.0] - 2026-09-04
+
+### Changed
+- Migrate macOS and Linux synchronization to AppleSyncKit 0.5.0's `SyncCoordinator`, local-source adapters, and atomic `sync-state.json` journal
+- Run full and one-directional multi-entity synchronization under one lock and one remote client session
+
+### Fixed
+- Preserve encryption, calendar windows, date-range metadata, canonical entity ordering, and last-write-wins conflict behavior during the migration
+- Report rejected direct-D1 deletes instead of treating them as successful
+
 ## [0.6.0] - 2026-08-08
 
 ### Added

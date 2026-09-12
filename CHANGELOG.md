@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Add `--recurrence` (with `--recurrence-interval/-end/-count/-days/-days-of-month/-months`) and `--clear-recurrence` to `reminders create` / `update` (app)
+- Add `occurrenceCount` to `recurrenceRules` in JSON output (mod)
+
 ## [0.7.0] - 2026-09-04
 
 ### Changed

@@ -78,6 +78,7 @@
       parentTitle: String? = nil,
       flagged: Bool? = nil,
       locationTrigger: LocationTrigger? = nil,
+      recurrenceRule: RecurrenceRule? = nil,
       useShortcuts: Bool = true
     ) async throws -> Reminder {
       try await permissionService.ensureRemindersAccess()
@@ -90,7 +91,8 @@
         url: url,
         dueDate: dueDate,
         priority: priority,
-        locationTrigger: locationTrigger
+        locationTrigger: locationTrigger,
+        recurrenceRule: recurrenceRule
       )
 
       // Step 2: Post-process with advanced features if needed (tags, flagged, parentTitle, url)
@@ -126,6 +128,8 @@
       flagged: Bool? = nil,
       locationTrigger: LocationTrigger? = nil,
       clearLocation: Bool = false,
+      recurrenceRule: RecurrenceRule? = nil,
+      clearRecurrence: Bool = false,
       useShortcuts: Bool = true
     ) async throws -> Reminder {
       try await permissionService.ensureRemindersAccess()
@@ -143,7 +147,9 @@
         priority: priority,
         url: url,
         locationTrigger: locationTrigger,
-        clearLocation: clearLocation
+        clearLocation: clearLocation,
+        recurrenceRule: recurrenceRule,
+        clearRecurrence: clearRecurrence
       )
 
       // Step 2: Post-process with advanced features if needed
@@ -299,7 +305,8 @@
       url: String?,
       dueDate: String?,
       priority: Int?,
-      locationTrigger: LocationTrigger?
+      locationTrigger: LocationTrigger?,
+      recurrenceRule: RecurrenceRule?
     ) throws -> String {
       let ekReminder = EKReminder(eventStore: eventStore)
       ekReminder.title = title
@@ -341,6 +348,11 @@
         ekReminder.addAlarm(trigger.toEKAlarm())
       }
 
+      // Repeat rule (needs the due date set above)
+      if let rule = recurrenceRule {
+        try ekReminder.setRecurrenceRule(rule)
+      }
+
       try eventStore.save(ekReminder, commit: true)
       return ekReminder.calendarItemIdentifier
     }
@@ -358,7 +370,9 @@
       priority: Int?,
       url: String?,
       locationTrigger: LocationTrigger?,
-      clearLocation: Bool
+      clearLocation: Bool,
+      recurrenceRule: RecurrenceRule?,
+      clearRecurrence: Bool
     ) throws {
       guard let ekReminder = eventStore.calendarItem(withIdentifier: id) as? EKReminder else {
         throw EventCLIError.notFound("Reminder with ID '\(id)' not found")
@@ -407,6 +421,14 @@
       }
       if let trigger = locationTrigger {
         ekReminder.addAlarm(trigger.toEKAlarm())
+      }
+
+      // Repeat rule: clear or replace. After the due-date change, so --due and --recurrence
+      // can be given together.
+      if clearRecurrence {
+        ekReminder.recurrenceRules = nil
+      } else if let rule = recurrenceRule {
+        try ekReminder.setRecurrenceRule(rule)
       }
 
       try eventStore.save(ekReminder, commit: true)

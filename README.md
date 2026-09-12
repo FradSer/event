@@ -80,6 +80,13 @@ event reminders create --title "Buy groceries" --tags "shopping,urgent"
 # Mark reminder complete
 event reminders update --id <REMINDER_ID> --completed
 
+# Repeat monthly (a repeat rule needs a due date)
+event reminders create --title "Pay rent" --due "2026-10-01 09:00:00" --recurrence monthly
+
+# Repeat every other Monday and Wednesday until year end; remove the rule
+event reminders update --id <REMINDER_ID> --recurrence weekly --recurrence-interval 2 --recurrence-days mon,wed --recurrence-end 2026-12-31
+event reminders update --id <REMINDER_ID> --clear-recurrence
+
 # Delete a reminder
 event reminders delete --id <REMINDER_ID>
 ```

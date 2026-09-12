@@ -100,6 +100,83 @@
       XCTAssertTrue(rule.endDate?.starts(with: "202") ?? false)
     }
 
+    func testRecurrenceRuleWithOccurrenceCount() {
+      let ekRule = EKRecurrenceRule(
+        recurrenceWith: .weekly,
+        interval: 1,
+        end: EKRecurrenceEnd(occurrenceCount: 5)
+      )
+
+      let rule = RecurrenceRule(from: ekRule)
+
+      XCTAssertEqual(rule.occurrenceCount, 5)
+      XCTAssertNil(rule.endDate)
+    }
+
+    // MARK: - toEKRecurrenceRule
+
+    func testToEKRecurrenceRuleWeeklyRoundTrip() throws {
+      let rule = RecurrenceRule(
+        frequency: "weekly",
+        interval: 2,
+        daysOfWeek: ["Monday", "Wednesday"],
+        daysOfMonth: nil,
+        monthsOfYear: nil,
+        weeksOfYear: nil,
+        daysOfYear: nil,
+        setPositions: nil,
+        endDate: "2027-12-31"
+      )
+
+      let ekRule = try rule.toEKRecurrenceRule()
+
+      XCTAssertEqual(ekRule.frequency, .weekly)
+      XCTAssertEqual(ekRule.interval, 2)
+      XCTAssertEqual(ekRule.daysOfTheWeek?.map { $0.dayOfTheWeek }, [.monday, .wednesday])
+      XCTAssertNotNil(ekRule.recurrenceEnd?.endDate)
+
+      let back = RecurrenceRule(from: ekRule)
+      XCTAssertEqual(back.frequency, "weekly")
+      XCTAssertEqual(back.interval, 2)
+      XCTAssertEqual(back.daysOfWeek, ["Monday", "Wednesday"])
+      XCTAssertEqual(back.endDate, "2027-12-31")
+    }
+
+    func testToEKRecurrenceRuleMonthlyWithCount() throws {
+      let rule = RecurrenceRule(
+        frequency: "monthly",
+        interval: 1,
+        daysOfWeek: nil,
+        daysOfMonth: [1, 15],
+        monthsOfYear: nil,
+        weeksOfYear: nil,
+        daysOfYear: nil,
+        setPositions: nil,
+        endDate: nil,
+        occurrenceCount: 3
+      )
+
+      let ekRule = try rule.toEKRecurrenceRule()
+
+      XCTAssertEqual(ekRule.frequency, .monthly)
+      XCTAssertEqual(ekRule.daysOfTheMonth?.map { $0.intValue }, [1, 15])
+      XCTAssertNil(ekRule.daysOfTheWeek)
+      XCTAssertEqual(ekRule.recurrenceEnd?.occurrenceCount, 3)
+      XCTAssertEqual(RecurrenceRule(from: ekRule).occurrenceCount, 3)
+    }
+
+    func testToEKRecurrenceRuleRejectsUnknownFrequencyAndWeekday() {
+      let unknownFrequency = RecurrenceRule(
+        frequency: "hourly", interval: 1, daysOfWeek: nil, daysOfMonth: nil, monthsOfYear: nil,
+        weeksOfYear: nil, daysOfYear: nil, setPositions: nil, endDate: nil)
+      XCTAssertThrowsError(try unknownFrequency.toEKRecurrenceRule())
+
+      let unknownWeekday = RecurrenceRule(
+        frequency: "weekly", interval: 1, daysOfWeek: ["Funday"], daysOfMonth: nil,
+        monthsOfYear: nil, weeksOfYear: nil, daysOfYear: nil, setPositions: nil, endDate: nil)
+      XCTAssertThrowsError(try unknownWeekday.toEKRecurrenceRule())
+    }
+
     func testRecurrenceRuleCodable() throws {
       let ekRule = EKRecurrenceRule(
         recurrenceWith: .weekly,

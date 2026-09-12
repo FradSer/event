@@ -79,6 +79,152 @@ struct ReminderCommands: AsyncParsableCommand {
     }
   }
 
+  /// Shared `--recurrence*` flags for the commands that accept a repeat rule.
+  struct RecurrenceOptions: ParsableArguments {
+    @Option(name: .long, help: "Repeat frequency: daily | weekly | monthly | yearly")
+    var recurrence: String?
+
+    @Option(name: .long, help: "Repeat every N periods (default 1)")
+    var recurrenceInterval: Int?
+
+    @Option(name: .long, help: "Last day of the series (yyyy-MM-dd, inclusive)")
+    var recurrenceEnd: String?
+
+    @Option(name: .long, help: "Stop after N occurrences (instead of --recurrence-end)")
+    var recurrenceCount: Int?
+
+    @Option(
+      name: .long,
+      help: "Comma-separated weekdays for weekly/monthly/yearly rules (e.g. \"mon,wed\" or \"2,4\")"
+    )
+    var recurrenceDays: String?
+
+    @Option(name: .long, help: "Comma-separated days of the month (1-31) for monthly rules")
+    var recurrenceDaysOfMonth: String?
+
+    @Option(name: .long, help: "Comma-separated months (1-12) for yearly rules")
+    var recurrenceMonths: String?
+
+    /// `true` when any of the recurrence flags were supplied on the command line.
+    var isPresent: Bool {
+      recurrence != nil || recurrenceInterval != nil || recurrenceEnd != nil
+        || recurrenceCount != nil || recurrenceDays != nil || recurrenceDaysOfMonth != nil
+        || recurrenceMonths != nil
+    }
+
+    static let frequencies = ["daily", "weekly", "monthly", "yearly"]
+
+    /// Parse the supplied flags into a `RecurrenceRule`, returning `nil` when none were
+    /// supplied. Throws `EventCLIError.invalidInput` on a missing or unknown frequency,
+    /// out-of-range values, or a refinement that does not apply to the frequency.
+    func resolveRule() throws -> RecurrenceRule? {
+      guard isPresent else { return nil }
+      guard let rawFrequency = recurrence else {
+        throw EventCLIError.invalidInput(
+          "Recurrence requires --recurrence <daily|weekly|monthly|yearly>; "
+            + "the other --recurrence-* flags refine it."
+        )
+      }
+      let frequency = rawFrequency.lowercased()
+      guard Self.frequencies.contains(frequency) else {
+        throw EventCLIError.invalidInput(
+          "--recurrence must be daily, weekly, monthly or yearly (got '\(rawFrequency)')."
+        )
+      }
+
+      let interval = recurrenceInterval ?? 1
+      guard interval >= 1 else {
+        throw EventCLIError.invalidInput(
+          "--recurrence-interval must be at least 1 (got \(interval)).")
+      }
+      if recurrenceEnd != nil, recurrenceCount != nil {
+        throw EventCLIError.invalidInput(
+          "Use either --recurrence-end or --recurrence-count, not both.")
+      }
+      if let end = recurrenceEnd {
+        _ = try Date.validated(dateString: end)
+      }
+      if let count = recurrenceCount, count < 1 {
+        throw EventCLIError.invalidInput("--recurrence-count must be at least 1 (got \(count)).")
+      }
+
+      let daysOfWeek = try recurrenceDays.map(Self.parseWeekdays)
+      if daysOfWeek != nil, frequency == "daily" {
+        throw EventCLIError.invalidInput(
+          "--recurrence-days applies to weekly, monthly or yearly rules, not daily.")
+      }
+      let daysOfMonth = try recurrenceDaysOfMonth.map {
+        try Self.parseIntegers($0, flag: "--recurrence-days-of-month", range: 1...31)
+      }
+      if daysOfMonth != nil, frequency != "monthly" {
+        throw EventCLIError.invalidInput(
+          "--recurrence-days-of-month applies to monthly rules only.")
+      }
+      let monthsOfYear = try recurrenceMonths.map {
+        try Self.parseIntegers($0, flag: "--recurrence-months", range: 1...12)
+      }
+      if monthsOfYear != nil, frequency != "yearly" {
+        throw EventCLIError.invalidInput("--recurrence-months applies to yearly rules only.")
+      }
+
+      return RecurrenceRule(
+        frequency: frequency,
+        interval: interval,
+        daysOfWeek: daysOfWeek,
+        daysOfMonth: daysOfMonth,
+        monthsOfYear: monthsOfYear,
+        weeksOfYear: nil,
+        daysOfYear: nil,
+        setPositions: nil,
+        endDate: recurrenceEnd,
+        occurrenceCount: recurrenceCount
+      )
+    }
+
+    /// Accepts full names, three-letter abbreviations (case-insensitive) or 1-7 (1 = Sunday).
+    static func parseWeekdays(_ raw: String) throws -> [String] {
+      let names = try raw.split(separator: ",").map { part -> String in
+        let token = part.trimmingCharacters(in: .whitespaces).lowercased()
+        if let number = Int(token) {
+          guard (1...7).contains(number) else {
+            throw EventCLIError.invalidInput(
+              "--recurrence-days: weekday numbers run 1 (Sunday) to 7 (Saturday), got \(number).")
+          }
+          return RecurrenceRule.weekdayNames[number]
+        }
+        let match = RecurrenceRule.weekdayNames.dropFirst().first { name in
+          let lower = name.lowercased()
+          return lower == token || (token.count == 3 && lower.hasPrefix(token))
+        }
+        guard let match else {
+          throw EventCLIError.invalidInput("--recurrence-days: unknown weekday '\(part)'.")
+        }
+        return match
+      }
+      guard !names.isEmpty else {
+        throw EventCLIError.invalidInput("--recurrence-days needs at least one weekday.")
+      }
+      return names
+    }
+
+    static func parseIntegers(_ raw: String, flag: String, range: ClosedRange<Int>) throws -> [Int]
+    {
+      let values = try raw.split(separator: ",").map { part -> Int in
+        let token = part.trimmingCharacters(in: .whitespaces)
+        guard let number = Int(token), range.contains(number) else {
+          throw EventCLIError.invalidInput(
+            "\(flag) expects integers from \(range.lowerBound) to \(range.upperBound), got '\(token)'."
+          )
+        }
+        return number
+      }
+      guard !values.isEmpty else {
+        throw EventCLIError.invalidInput("\(flag) needs at least one value.")
+      }
+      return values
+    }
+  }
+
   struct List: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       abstract: "List reminders"
@@ -171,6 +317,8 @@ struct ReminderCommands: AsyncParsableCommand {
 
     @OptionGroup var locationOptions: LocationOptions
 
+    @OptionGroup var recurrenceOptions: RecurrenceOptions
+
     @Flag(name: .long, help: "Disable Shortcut integration")
     var noShortcuts = false
 
@@ -180,6 +328,7 @@ struct ReminderCommands: AsyncParsableCommand {
     func run() async throws {
       #if canImport(EventKit)
         let locationTrigger = try locationOptions.resolveTrigger()
+        let recurrenceRule = try recurrenceOptions.resolveRule()
         let service = ReminderService()
         let reminder = try await service.createReminder(
           title: title,
@@ -192,6 +341,7 @@ struct ReminderCommands: AsyncParsableCommand {
           parentTitle: parentTitle,
           flagged: flagged,
           locationTrigger: locationTrigger,
+          recurrenceRule: recurrenceRule,
           useShortcuts: !noShortcuts
         )
       #else
@@ -206,10 +356,11 @@ struct ReminderCommands: AsyncParsableCommand {
         )
         let reminder = try await backend.createReminder(params)
         if tags != nil || parentTitle != nil || flagged != nil
-          || locationOptions.isPresent || noShortcuts
+          || locationOptions.isPresent || recurrenceOptions.isPresent || noShortcuts
         {
           print(
-            "Note: tags, parentTitle, flagged, location triggers, and shortcuts are macOS-only features."
+            "Note: tags, parentTitle, flagged, location triggers, recurrence, and shortcuts are "
+              + "macOS-only features."
           )
         }
       #endif
@@ -268,6 +419,11 @@ struct ReminderCommands: AsyncParsableCommand {
     @Flag(name: .long, help: "Remove existing location-based alarms")
     var clearLocation = false
 
+    @OptionGroup var recurrenceOptions: RecurrenceOptions
+
+    @Flag(name: .long, help: "Remove the repeat rule")
+    var clearRecurrence = false
+
     @Flag(name: .long, help: "Disable Shortcut integration")
     var noShortcuts = false
 
@@ -289,9 +445,15 @@ struct ReminderCommands: AsyncParsableCommand {
           "Use either --location/--latitude/--longitude or --clear-location, not both."
         )
       }
+      if clearRecurrence, recurrenceOptions.isPresent {
+        throw EventCLIError.invalidInput(
+          "Use either --recurrence/--recurrence-* or --clear-recurrence, not both."
+        )
+      }
 
       #if canImport(EventKit)
         let locationTrigger = try locationOptions.resolveTrigger()
+        let recurrenceRule = try recurrenceOptions.resolveRule()
         let service = ReminderService()
         let reminder = try await service.updateReminder(
           id: id,
@@ -309,6 +471,8 @@ struct ReminderCommands: AsyncParsableCommand {
           flagged: flagged,
           locationTrigger: locationTrigger,
           clearLocation: clearLocation,
+          recurrenceRule: recurrenceRule,
+          clearRecurrence: clearRecurrence,
           useShortcuts: !noShortcuts
         )
       #else
@@ -326,10 +490,12 @@ struct ReminderCommands: AsyncParsableCommand {
         )
         let reminder = try await backend.updateReminder(id: id, params: params)
         if tags != nil || parentTitle != nil || flagged != nil
-          || locationOptions.isPresent || clearLocation || noShortcuts
+          || locationOptions.isPresent || clearLocation || recurrenceOptions.isPresent
+          || clearRecurrence || noShortcuts
         {
           print(
-            "Note: tags, parentTitle, flagged, location triggers, and shortcuts are macOS-only features."
+            "Note: tags, parentTitle, flagged, location triggers, recurrence, and shortcuts are "
+              + "macOS-only features."
           )
         }
       #endif

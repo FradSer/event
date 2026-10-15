@@ -8,7 +8,7 @@ struct CalendarCommands: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "calendar",
     abstract: "Manage Apple Calendar (events, calendars)",
-    subcommands: [List.self, Create.self, Update.self, Delete.self]
+    subcommands: [List.self, Get.self, Calendars.self, Create.self, Update.self, Delete.self]
   )
 
   struct List: AsyncParsableCommand {
@@ -54,6 +54,66 @@ struct CalendarCommands: AsyncParsableCommand {
 
       let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
       print(formatter.format(events))
+    }
+  }
+
+  struct Get: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+      abstract: "Show one calendar event by ID"
+    )
+
+    @Option(name: .shortAndLong, help: "Event ID")
+    var id: String
+
+    @Flag(help: "Output in JSON format")
+    var json = false
+
+    func run() async throws {
+      #if canImport(EventKit)
+        let service = CalendarService()
+        let event = try await service.fetchEvent(byId: id)
+      #else
+        let backend = try await BackendFactory.makeCalendarBackend()
+        let event = try await backend.fetchEvent(byId: id)
+      #endif
+
+      let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
+      print(formatter.format(event))
+    }
+  }
+
+  struct Calendars: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+      abstract: "List all calendars"
+    )
+
+    @Flag(help: "Output in JSON format")
+    var json = false
+
+    func run() async throws {
+      #if canImport(EventKit)
+        let service = CalendarService()
+        let calendars = try await service.fetchCalendars()
+      #else
+        // The sync backends store events only, so they hold no calendar
+        // catalog to read. Derive the distinct names from a four-year window,
+        // which matches what a caller of `calendar list` can observe.
+        let backend = try await BackendFactory.makeCalendarBackend()
+        let today = Date()
+        let start = DateFormatter.eventDate.string(
+          from: Calendar.current.date(byAdding: .year, value: -4, to: today) ?? today)
+        let end = DateFormatter.eventDate.string(
+          from: Calendar.current.date(byAdding: .year, value: 4, to: today) ?? today)
+        let events = try await backend.fetchEvents(start: start, end: end, calendarName: nil)
+        var seen = Set<String>()
+        let calendars = events.compactMap { event -> EventCalendar? in
+          guard seen.insert(event.calendar).inserted else { return nil }
+          return EventCalendar(id: event.calendar, title: event.calendar)
+        }
+      #endif
+
+      let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
+      print(formatter.format(calendars))
     }
   }
 

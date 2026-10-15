@@ -18,6 +18,8 @@ public struct MarkdownFormatter: OutputFormatter {
       return formatReminderLists(lists)
     } else if let list = data as? ReminderList {
       return formatReminderList(list)
+    } else if let calendars = data as? [EventCalendar] {
+      return formatEventCalendars(calendars)
     } else {
       return JSONFormatter().format(data)
     }
@@ -178,6 +180,36 @@ public struct MarkdownFormatter: OutputFormatter {
     }
 
     output += "**ID:** `\(event.id)`\n"
+
+    return output
+  }
+
+  // MARK: - Calendar List Formatting
+
+  private func formatEventCalendars(_ calendars: [EventCalendar]) -> String {
+    guard !calendars.isEmpty else {
+      return "No calendars found."
+    }
+
+    var output = "### Calendars\n\n"
+
+    for calendar in calendars {
+      output += "- **\(calendar.title)**"
+      if calendar.isImmutable == true {
+        output += " (System)"
+      }
+      output += "\n"
+
+      if let source = calendar.source {
+        output += "  - Source: \(source)\n"
+      }
+
+      if calendar.allowsContentModifications == false {
+        output += "  - Read-only\n"
+      }
+
+      output += "  - ID: `\(calendar.id)`\n"
+    }
 
     return output
   }

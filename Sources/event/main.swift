@@ -7,14 +7,11 @@ struct EventCLI: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "event",
     abstract: "CLI tool for managing Apple Reminders and Calendar on macOS",
-    version: "0.7.0",
+    version: "0.8.0",
     subcommands: [
       ReminderCommands.self,
       CalendarCommands.self,
       SyncCommands.self,
     ]
   )
-
-  @Flag(name: .shortAndLong, help: "Disable Shortcut integration")
-  var noShortcuts: Bool = false
 }

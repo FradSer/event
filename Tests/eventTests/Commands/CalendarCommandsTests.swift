@@ -22,4 +22,25 @@ final class CalendarCommandsTests: XCTestCase {
 
     XCTAssertEqual(command.timezone, "America/Los_Angeles")
   }
+
+  func testGetParsesId() throws {
+    let command = try CalendarCommands.Get.parse([
+      "--id", "563017D1-59C6-4E77-BCD8-E34FC5795538:88976a38-d0a4-366e-a159-170de51c0a56",
+      "--json",
+    ])
+
+    XCTAssertEqual(
+      command.id, "563017D1-59C6-4E77-BCD8-E34FC5795538:88976a38-d0a4-366e-a159-170de51c0a56")
+    XCTAssertTrue(command.json)
+  }
+
+  func testGetRequiresId() {
+    XCTAssertThrowsError(try CalendarCommands.Get.parse([]))
+  }
+
+  func testCalendarsParsesJSONFlag() throws {
+    let command = try CalendarCommands.Calendars.parse(["--json"])
+
+    XCTAssertTrue(command.json)
+  }
 }

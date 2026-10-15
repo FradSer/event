@@ -208,8 +208,8 @@ struct ReminderCommands: AsyncParsableCommand {
         if tags != nil || parentTitle != nil || flagged != nil
           || locationOptions.isPresent || noShortcuts
         {
-          print(
-            "Note: tags, parentTitle, flagged, location triggers, and shortcuts are macOS-only features."
+          DiagnosticNote.write(
+            "Note: tags, parentTitle, flagged, location triggers, and shortcuts are macOS-only features.\n"
           )
         }
       #endif
@@ -328,8 +328,8 @@ struct ReminderCommands: AsyncParsableCommand {
         if tags != nil || parentTitle != nil || flagged != nil
           || locationOptions.isPresent || clearLocation || noShortcuts
         {
-          print(
-            "Note: tags, parentTitle, flagged, location triggers, and shortcuts are macOS-only features."
+          DiagnosticNote.write(
+            "Note: tags, parentTitle, flagged, location triggers, and shortcuts are macOS-only features.\n"
           )
         }
       #endif

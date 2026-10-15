@@ -224,9 +224,13 @@
       // If shortcuts are disabled, skip entirely
       if !useShortcuts {
         if tags != nil || parentTitle != nil || flagged != nil || url != nil {
-          print(
-            "Note: Advanced fields (tags, flagged, parentTitle, url) require Shortcut integration.")
-          print("Use without --no-shortcuts to enable.")
+          // Write the note to stderr. Stdout carries the JSON document the
+          // caller parses, so a note printed there made every URL write look
+          // like a parse failure even though the reminder was saved.
+          DiagnosticNote.write(
+            "Note: Advanced fields (tags, flagged, parentTitle, url) require Shortcut integration.\n"
+              + "Use without --no-shortcuts to enable.\n"
+          )
         }
         // Fallback for URL if shortcuts are disabled
         if let url = url, let validURL = URL(string: url) {
@@ -244,7 +248,7 @@
       do {
         isShortcutInstalled = try await shortcutsService.isShortcutInstalled(name: shortcutName)
       } catch {
-        print("Note: Could not check for shortcut. Advanced features disabled.")
+        DiagnosticNote.write("Note: Could not check for shortcut. Advanced features disabled.\n")
         // Fallback for URL
         if let url = url, let validURL = URL(string: url) {
           ekReminder.url = validURL
@@ -270,7 +274,7 @@
           _ = try await shortcutsService.runShortcut(name: shortcutName, input: payload)
           return
         } catch {
-          print("Note: Shortcut execution failed. Advanced features not set.")
+          DiagnosticNote.write("Note: Shortcut execution failed. Advanced features not set.\n")
           // Fallback for URL
           if let url = url, let validURL = URL(string: url) {
             ekReminder.url = validURL
@@ -281,9 +285,11 @@
       }
 
       // Shortcut not available - show info message
-      print("Note: AdvancedReminderEdit shortcut not found.")
-      print("Install it at: https://www.icloud.com/shortcuts/b578334075754da9ba6e50b501515808")
-      print("Without it, only basic reminder fields (title, notes, dueDate, priority) can be set.")
+      DiagnosticNote.write(
+        "Note: AdvancedReminderEdit shortcut not found.\n"
+          + "Install it at: https://www.icloud.com/shortcuts/b578334075754da9ba6e50b501515808\n"
+          + "Without it, only basic reminder fields (title, notes, dueDate, priority) can be set.\n"
+      )
       // Fallback for URL
       if let url = url, let validURL = URL(string: url) {
         ekReminder.url = validURL

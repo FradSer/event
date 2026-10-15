@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.0] - 2026-10-15
+
+### Added
+- Add `event calendar get --id`, a by-id lookup through `EKEventStore.event(withIdentifier:)` (app)
+- Add `event calendar calendars`, which reports every calendar for the `.event` entity with its source and write permission (app)
+
+### Fixed
+- Honour `--no-shortcuts` on `reminders create` and `reminders update`; the root command declared the same flag and ArgumentParser bound the value to that declaration, so the Shortcut ran even when the caller disabled it (app)
+- Write every Shortcut note to stderr, so stdout carries only the JSON or plain-text result and a caller that parses stdout no longer sees a false parse failure (app)
+
 ## [0.7.0] - 2026-09-04
 
 ### Changed

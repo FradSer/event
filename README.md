@@ -82,7 +82,13 @@ event reminders update --id <REMINDER_ID> --completed
 
 # Delete a reminder
 event reminders delete --id <REMINDER_ID>
+
+# Skip the AdvancedReminderEdit Shortcut and write basic fields directly
+# (pass the flag to the subcommand, after `create` or `update`)
+event reminders create --title "Buy groceries" --url https://example.com --no-shortcuts
 ```
+
+`--no-shortcuts` belongs to `reminders create` and `reminders update`. It writes the fields EventKit supports directly and skips the Shortcut, which is what a caller wants when the Shortcut is not installed. All diagnostic notes (missing Shortcut, disabled advanced fields) go to stderr; stdout carries only the JSON or plain-text result.
 
 ### Calendar
 
@@ -92,6 +98,13 @@ event calendar list
 
 # List events in date range
 event calendar list --start "2026-03-01" --end "2026-03-31"
+
+# List every calendar, including calendars with no events
+# (macOS: the EventKit catalog; sync backends: names found in a four-year window)
+event calendar calendars
+
+# Show one event by ID (constant-time lookup, no date window needed)
+event calendar get --id EVENT_ID
 
 # Create an event
 event calendar create --title "Meeting" --start "2026-03-10 14:00:00" --end "2026-03-10 15:00:00"
@@ -104,6 +117,8 @@ event calendar update --id EVENT_ID --timezone America/Los_Angeles
 ```
 
 `--timezone` accepts an IANA timezone identifier and applies only to timed events. On macOS, create and update parse timed input in the supplied timezone; updates without a new date preserve the event's start and end instants. On Linux and through sync backends, the identifier is retained as event metadata.
+
+`event calendar calendars` reports one entry per calendar. On macOS each entry carries `source`, `sourceType`, `allowsContentModifications`, `isImmutable`, and `color`, so two same-named calendars stay apart and a caller can tell a read-only calendar before a write fails. `event calendar get --id` resolves the event through `EKEventStore.event(withIdentifier:)`, the same lookup `update` and `delete` use, so an event that can be updated can always be read back.
 
 Calendar sync payloads include a date-format version so newer clients can distinguish timezone-aware dates from records written by older clients. Legacy records without this marker keep their previous machine-local interpretation until they are reserialized by an authoritative macOS device; the original source machine timezone cannot be recovered from the legacy payload alone. Re-sync older calendar records from that device before relying on their per-event timezone across machines.
 

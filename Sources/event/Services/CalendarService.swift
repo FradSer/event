@@ -41,6 +41,23 @@
       return ekEvents.map { CalendarEvent(from: $0) }
     }
 
+    /// Fetch every calendar EventKit holds for the `.event` entity.
+    ///
+    /// The event scan in `fetchEvents` reports calendar names only through the
+    /// events it returns, so a calendar with no event in the queried window
+    /// never appears. Reading the catalog answers for every calendar, and
+    /// includes the source so two same-named calendars stay apart.
+    func fetchCalendars() async throws -> [EventCalendar] {
+      try await permissionService.ensureCalendarAccess()
+
+      // A store that was just granted access can answer before its sources
+      // load, which makes the first call after the grant report an empty
+      // catalog. Ask for a refresh so that call sees the calendars.
+      eventStore.refreshSourcesIfNecessary()
+
+      return eventStore.calendars(for: .event).map { EventCalendar(from: $0) }
+    }
+
     /// Returns whether an event with the given EventKit identifier still exists locally.
     func eventExists(id: String) async -> Bool {
       eventStore.event(withIdentifier: id) != nil

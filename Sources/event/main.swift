@@ -14,7 +14,4 @@ struct EventCLI: AsyncParsableCommand {
       SyncCommands.self,
     ]
   )
-
-  @Flag(name: .shortAndLong, help: "Disable Shortcut integration")
-  var noShortcuts: Bool = false
 }

@@ -189,12 +189,6 @@
 
     // MARK: - Helper Functions
 
-    /// Writes a diagnostic line to stderr, so stdout stays reserved for the
-    /// result the caller parses.
-    private static func writeNote(_ message: String) {
-      FileHandle.standardError.write(Data(message.utf8))
-    }
-
     /// Check if advanced processing is needed
     private func needsAdvancedProcessing(
       tags: String?, parentTitle: String?, flagged: Bool?, url: String?
@@ -233,7 +227,7 @@
           // Write the note to stderr. Stdout carries the JSON document the
           // caller parses, so a note printed there made every URL write look
           // like a parse failure even though the reminder was saved.
-          Self.writeNote(
+          DiagnosticNote.write(
             "Note: Advanced fields (tags, flagged, parentTitle, url) require Shortcut integration.\n"
               + "Use without --no-shortcuts to enable.\n"
           )
@@ -254,7 +248,7 @@
       do {
         isShortcutInstalled = try await shortcutsService.isShortcutInstalled(name: shortcutName)
       } catch {
-        Self.writeNote("Note: Could not check for shortcut. Advanced features disabled.\n")
+        DiagnosticNote.write("Note: Could not check for shortcut. Advanced features disabled.\n")
         // Fallback for URL
         if let url = url, let validURL = URL(string: url) {
           ekReminder.url = validURL
@@ -280,7 +274,7 @@
           _ = try await shortcutsService.runShortcut(name: shortcutName, input: payload)
           return
         } catch {
-          Self.writeNote("Note: Shortcut execution failed. Advanced features not set.\n")
+          DiagnosticNote.write("Note: Shortcut execution failed. Advanced features not set.\n")
           // Fallback for URL
           if let url = url, let validURL = URL(string: url) {
             ekReminder.url = validURL
@@ -291,7 +285,7 @@
       }
 
       // Shortcut not available - show info message
-      Self.writeNote(
+      DiagnosticNote.write(
         "Note: AdvancedReminderEdit shortcut not found.\n"
           + "Install it at: https://www.icloud.com/shortcuts/b578334075754da9ba6e50b501515808\n"
           + "Without it, only basic reminder fields (title, notes, dueDate, priority) can be set.\n"

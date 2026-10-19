@@ -22,6 +22,8 @@ public struct CreateEventParams: Sendable {
   public let location: String?
   public let notes: String?
   public let url: String?
+  public let availability: CalendarEventAvailability?
+  public let alarmMinutes: [Int]?
   public let timeZoneIdentifier: String?
 
   public init(
@@ -33,6 +35,8 @@ public struct CreateEventParams: Sendable {
     location: String? = nil,
     notes: String? = nil,
     url: String? = nil,
+    availability: CalendarEventAvailability? = nil,
+    alarmMinutes: [Int]? = nil,
     timeZoneIdentifier: String? = nil
   ) {
     self.title = title
@@ -43,6 +47,8 @@ public struct CreateEventParams: Sendable {
     self.location = location
     self.notes = notes
     self.url = url
+    self.availability = availability
+    self.alarmMinutes = alarmMinutes
     self.timeZoneIdentifier = timeZoneIdentifier
   }
 }
@@ -57,6 +63,10 @@ public struct UpdateEventParams: Sendable {
   public let location: String?
   public let notes: String?
   public let url: String?
+  public let clearURL: Bool
+  public let availability: CalendarEventAvailability?
+  public let alarmMinutes: [Int]?
+  public let addAlarmMinutes: [Int]?
   public let timeZoneIdentifier: String?
 
   public init(
@@ -67,6 +77,10 @@ public struct UpdateEventParams: Sendable {
     location: String? = nil,
     notes: String? = nil,
     url: String? = nil,
+    clearURL: Bool = false,
+    availability: CalendarEventAvailability? = nil,
+    alarmMinutes: [Int]? = nil,
+    addAlarmMinutes: [Int]? = nil,
     timeZoneIdentifier: String? = nil
   ) {
     self.title = title
@@ -76,6 +90,10 @@ public struct UpdateEventParams: Sendable {
     self.location = location
     self.notes = notes
     self.url = url
+    self.clearURL = clearURL
+    self.availability = availability
+    self.alarmMinutes = alarmMinutes
+    self.addAlarmMinutes = addAlarmMinutes
     self.timeZoneIdentifier = timeZoneIdentifier
   }
 }

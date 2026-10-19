@@ -72,10 +72,12 @@
       location: String? = nil,
       notes: String? = nil,
       url: String? = nil,
+      availability: CalendarEventAvailability? = nil,
       alarmMinutes: [Int]? = nil,
       timeZoneIdentifier: String? = nil,
       dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
+      let eventURL = try parseURL(url)
       try await permissionService.ensureCalendarAccess()
 
       // Detect if this is an all-day event
@@ -111,9 +113,7 @@
       ekEvent.location = location
       ekEvent.notes = notes
       ekEvent.timeZone = eventTimeZone
-      if let urlString = url, let validURL = URL(string: urlString) {
-        ekEvent.url = validURL
-      }
+      ekEvent.url = eventURL
 
       // Add alarms (minutes before start; negative relative offset).
       // Convert to Double before multiplying to avoid Int overflow traps, and
@@ -126,7 +126,7 @@
         }
       }
 
-      // Set calendar
+      // Set calendar before availability, because not all calendars support it.
       if let calendarName = calendarName {
         let calendars = eventStore.calendars(for: .event).filter { $0.title == calendarName }
         guard let calendar = calendars.first else {
@@ -135,6 +135,17 @@
         ekEvent.calendar = calendar
       } else {
         ekEvent.calendar = eventStore.defaultCalendarForNewEvents
+      }
+
+      if let availability = availability {
+        let (eventValue, mask) = Self.eventKitAvailability(for: availability)
+        guard let calendar = ekEvent.calendar,
+          calendar.supportedEventAvailabilities.contains(mask)
+        else {
+          throw EventCLIError.invalidInput(
+            "The selected calendar does not support availability settings")
+        }
+        ekEvent.availability = eventValue
       }
 
       try eventStore.save(ekEvent, span: .thisEvent, commit: true)
@@ -150,12 +161,18 @@
       location: String? = nil,
       notes: String? = nil,
       url: String? = nil,
+      clearURL: Bool = false,
+      availability: CalendarEventAvailability? = nil,
       alarmMinutes: [Int]? = nil,
       addAlarmMinutes: [Int]? = nil,
       timeZoneIdentifier: String? = nil,
       clearTimeZone: Bool = false,
       dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
+      let eventURL = try parseURL(url)
+      if clearURL, url != nil {
+        throw EventCLIError.invalidInput("Use only one of --url or --clear-url")
+      }
       try await permissionService.ensureCalendarAccess()
 
       guard let ekEvent = eventStore.event(withIdentifier: id) else {
@@ -211,8 +228,21 @@
         ekEvent.notes = notes
       }
 
-      if let urlString = url, let validURL = URL(string: urlString) {
-        ekEvent.url = validURL
+      if clearURL {
+        ekEvent.url = nil
+      } else if let eventURL {
+        ekEvent.url = eventURL
+      }
+
+      if let availability = availability {
+        let (eventValue, mask) = Self.eventKitAvailability(for: availability)
+        guard let calendar = ekEvent.calendar,
+          calendar.supportedEventAvailabilities.contains(mask)
+        else {
+          throw EventCLIError.invalidInput(
+            "The event's calendar does not support availability settings")
+        }
+        ekEvent.availability = eventValue
       }
 
       // Replace alarms when provided (minutes before start). [] clears all.
@@ -300,6 +330,8 @@
         location: params.location,
         notes: params.notes,
         url: params.url,
+        availability: params.availability,
+        alarmMinutes: params.alarmMinutes,
         timeZoneIdentifier: params.timeZoneIdentifier
       )
     }
@@ -313,12 +345,37 @@
         location: params.location,
         notes: params.notes,
         url: params.url,
+        clearURL: params.clearURL,
+        availability: params.availability,
+        alarmMinutes: params.alarmMinutes,
+        addAlarmMinutes: params.addAlarmMinutes,
         timeZoneIdentifier: params.timeZoneIdentifier
       )
     }
 
     func deleteEvent(id: String) async throws {
       try await deleteEvent(id: id, span: "this")
+    }
+  }
+
+  extension CalendarService {
+    fileprivate func parseURL(_ value: String?) throws -> URL? {
+      guard let value else { return nil }
+      guard let url = URL(string: value), url.scheme != nil else {
+        throw EventCLIError.invalidInput("--url must be an absolute URL")
+      }
+      return url
+    }
+
+    fileprivate static func eventKitAvailability(
+      for availability: CalendarEventAvailability
+    ) -> (EKEventAvailability, EKCalendarEventAvailabilityMask) {
+      switch availability {
+      case .busy: (.busy, .busy)
+      case .free: (.free, .free)
+      case .tentative: (.tentative, .tentative)
+      case .unavailable: (.unavailable, .unavailable)
+      }
     }
   }
 

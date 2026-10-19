@@ -67,6 +67,41 @@ final class SQLiteCalendarServiceTests: XCTestCase {
     XCTAssertEqual(fetched.title, event.title)
   }
 
+  func testCalendarURLAvailabilityAndAlarmsRoundTripThroughWrites() async throws {
+    let created = try await service.createEvent(
+      CreateEventParams(
+        title: "Calendar write fields",
+        startDate: "2026-10-20 09:00:00",
+        endDate: "2026-10-20 10:00:00",
+        url: "https://example.com/event",
+        availability: .free,
+        alarmMinutes: [15, 15, 60]
+      ))
+
+    XCTAssertEqual(created.url, "https://example.com/event")
+    XCTAssertEqual(created.availability, "free")
+    XCTAssertEqual(created.alarms?.compactMap(\.relativeOffset), [-900, -3600])
+
+    let updated = try await service.updateEvent(
+      id: created.id,
+      params: UpdateEventParams(
+        clearURL: true,
+        availability: .tentative,
+        alarmMinutes: [5],
+        addAlarmMinutes: [10, 5]
+      ))
+
+    XCTAssertNil(updated.url)
+    XCTAssertEqual(updated.availability, "tentative")
+    XCTAssertEqual(updated.alarms?.compactMap(\.relativeOffset), [-300, -600])
+
+    let cleared = try await service.updateEvent(
+      id: created.id,
+      params: UpdateEventParams(alarmMinutes: [])
+    )
+    XCTAssertEqual(cleared.alarms, [])
+  }
+
   func testCreateAllDayEvent() async throws {
     let startDate = ISO8601DateFormatter().string(from: Date())
     let endDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(86400))

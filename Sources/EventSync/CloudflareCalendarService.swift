@@ -69,8 +69,8 @@ public actor CloudflareCalendarService: CalendarBackend {
       creationDate: now,
       lastModifiedDate: now,
       status: nil,
-      availability: nil,
-      alarms: nil,
+      availability: params.availability?.rawValue,
+      alarms: Alarm.relativeAlarms(minutesBeforeStart: params.alarmMinutes),
       recurrenceRules: nil,
       attendees: nil
     )
@@ -130,14 +130,18 @@ public actor CloudflareCalendarService: CalendarBackend {
       isAllDay: isAllDay,
       location: params.location ?? existing.location,
       notes: params.notes ?? existing.notes,
-      url: params.url ?? existing.url,
+      url: params.clearURL ? nil : params.url ?? existing.url,
       timeZone: isAllDay ? nil : timeZone?.identifier ?? existing.timeZone,
       dateFormatVersion: existing.dateFormatVersion,
       creationDate: existing.creationDate,
       lastModifiedDate: now,
       status: existing.status,
-      availability: existing.availability,
-      alarms: existing.alarms,
+      availability: params.availability?.rawValue ?? existing.availability,
+      alarms: Alarm.updated(
+        existing: existing.alarms,
+        replacing: params.alarmMinutes,
+        adding: params.addAlarmMinutes
+      ),
       recurrenceRules: existing.recurrenceRules,
       attendees: existing.attendees
     )

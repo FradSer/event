@@ -73,8 +73,8 @@ public actor SQLiteCalendarService: CalendarBackend {
       creationDate: now,
       lastModifiedDate: now,
       status: nil,
-      availability: nil,
-      alarms: nil,
+      availability: params.availability?.rawValue,
+      alarms: Alarm.relativeAlarms(minutesBeforeStart: params.alarmMinutes),
       recurrenceRules: nil,
       attendees: nil
     )
@@ -110,8 +110,9 @@ public actor SQLiteCalendarService: CalendarBackend {
     if let startDateInput = params.startDate {
       startDate = startDateInput
     } else if let timeZone, !isAllDay, existing.usesEventTimeZoneDateFormat {
-      startDate = (try? DateValidator.convertDateTime(
-        existing.startDate, from: existingTimeZone, to: timeZone)) ?? existing.startDate
+      startDate =
+        (try? DateValidator.convertDateTime(
+          existing.startDate, from: existingTimeZone, to: timeZone)) ?? existing.startDate
     } else {
       startDate = existing.startDate
     }
@@ -119,8 +120,9 @@ public actor SQLiteCalendarService: CalendarBackend {
     if let endDateInput = params.endDate {
       endDate = endDateInput
     } else if let timeZone, !isAllDay, existing.usesEventTimeZoneDateFormat {
-      endDate = (try? DateValidator.convertDateTime(
-        existing.endDate, from: existingTimeZone, to: timeZone)) ?? existing.endDate
+      endDate =
+        (try? DateValidator.convertDateTime(
+          existing.endDate, from: existingTimeZone, to: timeZone)) ?? existing.endDate
     } else {
       endDate = existing.endDate
     }
@@ -135,14 +137,18 @@ public actor SQLiteCalendarService: CalendarBackend {
       isAllDay: isAllDay,
       location: params.location ?? existing.location,
       notes: params.notes ?? existing.notes,
-      url: params.url ?? existing.url,
+      url: params.clearURL ? nil : params.url ?? existing.url,
       timeZone: isAllDay ? nil : timeZone?.identifier ?? existing.timeZone,
       dateFormatVersion: existing.dateFormatVersion,
       creationDate: existing.creationDate,
       lastModifiedDate: now,
       status: existing.status,
-      availability: existing.availability,
-      alarms: existing.alarms,
+      availability: params.availability?.rawValue ?? existing.availability,
+      alarms: Alarm.updated(
+        existing: existing.alarms,
+        replacing: params.alarmMinutes,
+        adding: params.addAlarmMinutes
+      ),
       recurrenceRules: existing.recurrenceRules,
       attendees: existing.attendees
     )
@@ -197,4 +203,5 @@ public actor SQLiteCalendarService: CalendarBackend {
     }
     return jsonString
   }
+
 }

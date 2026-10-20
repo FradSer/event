@@ -247,6 +247,38 @@
       timestamps.filter { candidates.contains($0.key) }
     }
 
+    static func writeFields(for item: CalendarEvent) -> (
+      availability: CalendarEventAvailability?, alarmMinutes: [Int]?
+    ) {
+      (
+        availability: item.availability.flatMap(CalendarEventAvailability.init(rawValue:)),
+        alarmMinutes: alarmMinutes(from: item.alarms)
+      )
+    }
+
+    private static func alarmMinutes(from alarms: [Alarm]?) -> [Int]? {
+      guard let alarms else { return nil }
+
+      // Sync can only write relative, minute-based display alarms. Leave the
+      // local alarm set unchanged if any remote alarm cannot be represented.
+      var minutesBeforeStart = [Int]()
+      for alarm in alarms {
+        guard alarm.absoluteDate == nil,
+          alarm.locationTrigger == nil,
+          alarm.alarmType == nil || alarm.alarmType == "display",
+          let offset = alarm.relativeOffset,
+          offset.isFinite,
+          offset <= 0,
+          let minutes = Int(exactly: -offset / 60),
+          minutes >= 0
+        else {
+          return nil
+        }
+        minutesBeforeStart.append(minutes)
+      }
+      return minutesBeforeStart
+    }
+
     func transformForPush(_ record: CalendarEvent) async throws -> CalendarEvent {
       try await encryptor.encryptEvents([record])[0]
     }
@@ -291,10 +323,12 @@
     func applyRemoteUpsert(
       _ item: CalendarEvent, localId: String, remoteId: String, lastModified: String
     ) async throws -> String? {
+      let writeFields = Self.writeFields(for: item)
       do {
         _ = try await service.updateEvent(
           id: localId, title: item.title, startDate: item.startDate, endDate: item.endDate,
           location: item.location, notes: item.notes, url: item.url,
+          availability: writeFields.availability, alarmMinutes: writeFields.alarmMinutes,
           timeZoneIdentifier: item.syncTimeZoneIdentifier,
           clearTimeZone: item.shouldClearTimeZoneOnSync,
           dateFormatVersion: item.dateFormatVersion)
@@ -303,6 +337,7 @@
         let created = try await service.createEvent(
           title: item.title, startDate: item.startDate, endDate: item.endDate,
           calendarName: item.calendar, location: item.location, notes: item.notes, url: item.url,
+          availability: writeFields.availability, alarmMinutes: writeFields.alarmMinutes,
           timeZoneIdentifier: item.syncTimeZoneIdentifier,
           dateFormatVersion: item.dateFormatVersion)
         return created.id

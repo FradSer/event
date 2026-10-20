@@ -1,3 +1,4 @@
+import AppleSyncKit
 import EventModels
 import EventSync
 import XCTest
@@ -32,6 +33,67 @@ final class SyncCommandsTests: XCTestCase {
     let filtered = EventKitCalendarSyncSource.deletionTimestamps(timestamps, for: ["inside"])
 
     XCTAssertEqual(filtered, ["inside": "2026-01-01"])
+  }
+
+  func testUnrepresentablePulledURLSuppressesLocalPushes() throws {
+    let item = makeCalendarEvent(availability: nil, alarms: nil, url: "ftp://example.com/x")
+    var state = SyncEntityState()
+    try state.recordSyncedValue(
+      item,
+      remoteId: "remote-event-1",
+      lastModified: "2026-10-21T00:00:00Z",
+      volatileKeys: calendarEventSnapshotVolatileKeys
+    )
+
+    try EventKitCalendarSyncSource.recordURLPushability(
+      for: item, remoteId: "remote-event-1", state: &state)
+
+    XCTAssertFalse(EventKitCalendarSyncSource.canPush(remoteId: "remote-event-1", state: state))
+  }
+
+  func testRepresentablePulledURLAllowsLocalPushes() throws {
+    let item = makeCalendarEvent(
+      availability: nil, alarms: nil, url: "https://example.com/event")
+    var state = SyncEntityState()
+    try state.recordSyncedValue(
+      item,
+      remoteId: "remote-event-1",
+      lastModified: "2026-10-21T00:00:00Z",
+      volatileKeys: calendarEventSnapshotVolatileKeys
+    )
+
+    try EventKitCalendarSyncSource.recordURLPushability(
+      for: item, remoteId: "remote-event-1", state: &state)
+
+    XCTAssertTrue(EventKitCalendarSyncSource.canPush(remoteId: "remote-event-1", state: state))
+  }
+
+  func testRepresentablePullReplacesUnsupportedURLPushMarker() throws {
+    let unsupported = makeCalendarEvent(
+      availability: nil, alarms: nil, url: "ftp://example.com/x")
+    let supported = makeCalendarEvent(
+      availability: nil, alarms: nil, url: "https://example.com/event")
+    var state = SyncEntityState()
+    try state.recordSyncedValue(
+      unsupported,
+      remoteId: "remote-event-1",
+      lastModified: "2026-10-21T00:00:00Z",
+      volatileKeys: calendarEventSnapshotVolatileKeys
+    )
+    try EventKitCalendarSyncSource.recordURLPushability(
+      for: unsupported, remoteId: "remote-event-1", state: &state)
+    XCTAssertFalse(EventKitCalendarSyncSource.canPush(remoteId: "remote-event-1", state: state))
+
+    try state.recordSyncedValue(
+      supported,
+      remoteId: "remote-event-1",
+      lastModified: "2026-10-21T00:01:00Z",
+      volatileKeys: calendarEventSnapshotVolatileKeys
+    )
+    try EventKitCalendarSyncSource.recordURLPushability(
+      for: supported, remoteId: "remote-event-1", state: &state)
+
+    XCTAssertTrue(EventKitCalendarSyncSource.canPush(remoteId: "remote-event-1", state: state))
   }
 
   func testCalendarSyncWriteFieldsCarrySupportedAvailabilityAndRelativeAlarms() {
@@ -73,7 +135,9 @@ final class SyncCommandsTests: XCTestCase {
     XCTAssertEqual(cleared.alarmMinutes, [])
   }
 
-  private func makeCalendarEvent(availability: String?, alarms: [Alarm]?) -> CalendarEvent {
+  private func makeCalendarEvent(
+    availability: String?, alarms: [Alarm]?, url: String? = nil
+  ) -> CalendarEvent {
     CalendarEvent(
       id: "event-1",
       title: "Meeting",
@@ -83,7 +147,7 @@ final class SyncCommandsTests: XCTestCase {
       isAllDay: false,
       location: nil,
       notes: nil,
-      url: nil,
+      url: url,
       timeZone: "America/Los_Angeles",
       creationDate: nil,
       lastModifiedDate: nil,

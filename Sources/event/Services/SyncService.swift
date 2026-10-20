@@ -204,6 +204,8 @@
   }
 
   struct EventKitCalendarSyncSource: LocalSyncSource {
+    private static let unsupportedURLSnapshotMarker = "__eventkit_unrepresentable_url__"
+
     let service: CalendarService
     let encryptor: EventEncryptor
     let window: (start: String, end: String)
@@ -234,9 +236,17 @@
         currentRemoteIds: currentRemoteIds, withinRange: range)
       let deletionTimestamps = Self.deletionTimestamps(
         discovered.deletionLastModifiedByRemoteId, for: deletionCandidates)
+      let pushableRecords = discovered.records.filter { record in
+        let remoteId = context.localToRemoteId[record.id] ?? record.id
+        return Self.canPush(remoteId: remoteId, state: context.entityState)
+      }
+      let pushableRemoteIds = Set(
+        pushableRecords.map { context.localToRemoteId[$0.id] ?? $0.id })
       return LocalSyncChanges(
-        records: discovered.records,
-        lastModifiedByRemoteId: discovered.lastModifiedByRemoteId,
+        records: pushableRecords,
+        lastModifiedByRemoteId: discovered.lastModifiedByRemoteId.filter {
+          pushableRemoteIds.contains($0.key)
+        },
         deletionCandidates: deletionCandidates,
         deletionLastModifiedByRemoteId: deletionTimestamps)
     }
@@ -245,6 +255,10 @@
       _ timestamps: [String: String], for candidates: [String]
     ) -> [String: String] {
       timestamps.filter { candidates.contains($0.key) }
+    }
+
+    static func canPush(remoteId: String, state: SyncEntityState) -> Bool {
+      state.snapshotsByRemoteId[remoteId] != unsupportedURLSnapshotMarker
     }
 
     static func writeFields(for item: CalendarEvent) -> (
@@ -315,6 +329,20 @@
       _ record: CalendarEvent, remoteId: String, state: inout SyncEntityState
     ) throws {
       state.recordDateRange(record.syncDateRange(), for: remoteId)
+      try Self.recordURLPushability(for: record, remoteId: remoteId, state: &state)
+    }
+
+    static func recordURLPushability(
+      for record: CalendarEvent, remoteId: String, state: inout SyncEntityState
+    ) throws {
+      if let url = record.url, safeCalendarEventURL(url) == nil {
+        // EventKit cannot store this cloud URL. Keep the remote ID known but
+        // suppress local pushes until a later pull supplies a representable URL.
+        state.snapshotsByRemoteId[remoteId] = Self.unsupportedURLSnapshotMarker
+      } else {
+        state.snapshotsByRemoteId[remoteId] = try SyncSnapshotEncoder.encode(
+          record, volatileKeys: calendarEventSnapshotVolatileKeys)
+      }
     }
 
     func acknowledgePushed(localIds: [String]) async throws {}

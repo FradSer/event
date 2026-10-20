@@ -74,11 +74,12 @@
       url: String? = nil,
       availability: CalendarEventAvailability? = nil,
       skipUnsupportedAvailability: Bool = false,
+      skipUnsupportedURL: Bool = false,
       alarmMinutes: [Int]? = nil,
       timeZoneIdentifier: String? = nil,
       dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
-      let eventURL = try parseURL(url)
+      let eventURL = try Self.parseURL(url, skipUnsupportedURL: skipUnsupportedURL)
       try await permissionService.ensureCalendarAccess()
 
       // Detect if this is an all-day event
@@ -166,13 +167,14 @@
       clearURL: Bool = false,
       availability: CalendarEventAvailability? = nil,
       skipUnsupportedAvailability: Bool = false,
+      skipUnsupportedURL: Bool = false,
       alarmMinutes: [Int]? = nil,
       addAlarmMinutes: [Int]? = nil,
       timeZoneIdentifier: String? = nil,
       clearTimeZone: Bool = false,
       dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
     ) async throws -> CalendarEvent {
-      let eventURL = try parseURL(url)
+      let eventURL = try Self.parseURL(url, skipUnsupportedURL: skipUnsupportedURL)
       if clearURL, url != nil {
         throw EventCLIError.invalidInput("Use only one of --url or --clear-url")
       }
@@ -363,9 +365,10 @@
   }
 
   extension CalendarService {
-    fileprivate func parseURL(_ value: String?) throws -> URL? {
+    static func parseURL(_ value: String?, skipUnsupportedURL: Bool = false) throws -> URL? {
       guard let value else { return nil }
       guard let url = safeCalendarEventURL(value) else {
+        if skipUnsupportedURL { return nil }
         throw EventCLIError.invalidInput("--url must be an absolute URL with a safe scheme")
       }
       return url

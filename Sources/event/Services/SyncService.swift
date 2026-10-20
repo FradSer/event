@@ -329,6 +329,7 @@
           id: localId, title: item.title, startDate: item.startDate, endDate: item.endDate,
           location: item.location, notes: item.notes, url: item.url,
           availability: writeFields.availability, skipUnsupportedAvailability: true,
+          skipUnsupportedURL: true,
           alarmMinutes: writeFields.alarmMinutes,
           timeZoneIdentifier: item.syncTimeZoneIdentifier,
           clearTimeZone: item.shouldClearTimeZoneOnSync,
@@ -339,6 +340,7 @@
           title: item.title, startDate: item.startDate, endDate: item.endDate,
           calendarName: item.calendar, location: item.location, notes: item.notes, url: item.url,
           availability: writeFields.availability, skipUnsupportedAvailability: true,
+          skipUnsupportedURL: true,
           alarmMinutes: writeFields.alarmMinutes,
           timeZoneIdentifier: item.syncTimeZoneIdentifier,
           dateFormatVersion: item.dateFormatVersion)

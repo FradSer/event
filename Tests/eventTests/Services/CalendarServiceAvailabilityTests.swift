@@ -43,5 +43,28 @@
         }
       }
     }
+
+    func testSyncSkipsURLThatCannotBeRepresentedLocally() throws {
+      XCTAssertNil(try CalendarService.parseURL("ftp://example.com/x", skipUnsupportedURL: true))
+    }
+
+    func testDirectWriteStillRejectsURLWithUnsupportedScheme() {
+      XCTAssertThrowsError(try CalendarService.parseURL("ftp://example.com/x")) { error in
+        guard
+          case EventCLIError.invalidInput("--url must be an absolute URL with a safe scheme") =
+            error
+        else {
+          XCTFail("Expected the existing unsupported-URL error, got: \(error)")
+          return
+        }
+      }
+    }
+
+    func testSyncPreservesSafeURL() throws {
+      XCTAssertEqual(
+        try CalendarService.parseURL("https://example.com/event", skipUnsupportedURL: true),
+        URL(string: "https://example.com/event")
+      )
+    }
   }
 #endif

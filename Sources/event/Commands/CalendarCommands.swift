@@ -357,11 +357,28 @@ struct CalendarCommands: AsyncParsableCommand {
   }
 }
 
+func safeCalendarEventURL(_ value: String) -> URL? {
+  guard let url = URL(string: value), let scheme = url.scheme?.lowercased(),
+    ["http", "https", "mailto"].contains(scheme)
+  else {
+    return nil
+  }
+
+  switch scheme {
+  case "http", "https":
+    guard let host = url.host, !host.isEmpty else { return nil }
+  case "mailto":
+    guard !url.path.isEmpty else { return nil }
+  default:
+    return nil
+  }
+
+  return url
+}
+
 private func validateEventURL(_ value: String?) throws {
   guard let value else { return }
-  guard let url = URL(string: value), let scheme = url.scheme?.lowercased(),
-    !["file", "javascript", "vbscript", "data", "jar", "dict", "gopher"].contains(scheme)
-  else {
+  guard safeCalendarEventURL(value) != nil else {
     throw ValidationError("Provide a valid absolute URL with a safe scheme.")
   }
 }

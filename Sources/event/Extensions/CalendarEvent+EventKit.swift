@@ -47,7 +47,7 @@
 
       let availability: String
       switch ekEvent.availability {
-      case .notSupported: availability = "not-supported"
+      case .notSupported: availability = "notSupported"
       case .busy: availability = "busy"
       case .free: availability = "free"
       case .tentative: availability = "tentative"

@@ -43,8 +43,24 @@ final class CalendarAlarmCommandsTests: XCTestCase {
   }
 
   func testCreateRejectsUnsafeURLScheme() {
-    XCTAssertThrowsError(
-      try CalendarCommands.Create.parse(Self.createBase + ["--url", "javascript:alert(1)"]))
+    for url in [
+      "javascript:alert(1)", "smb://attacker/share", "ftp://example.com/file",
+      "data:text/plain,hello", "https:///missing-host", "example.com/event",
+    ] {
+      XCTAssertThrowsError(
+        try CalendarCommands.Create.parse(Self.createBase + ["--url", url]),
+        "Expected unsafe URL to be rejected: \(url)")
+    }
+  }
+
+  func testCreateAllowsSafeURLSchemes() throws {
+    for url in [
+      "https://example.com/event", "http://example.com/event", "mailto:team@example.com",
+    ] {
+      XCTAssertNoThrow(
+        try CalendarCommands.Create.parse(Self.createBase + ["--url", url]),
+        "Expected safe URL to be accepted: \(url)")
+    }
   }
 
   // MARK: - update flag parsing

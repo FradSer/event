@@ -361,8 +361,8 @@
   extension CalendarService {
     fileprivate func parseURL(_ value: String?) throws -> URL? {
       guard let value else { return nil }
-      guard let url = URL(string: value), url.scheme != nil else {
-        throw EventCLIError.invalidInput("--url must be an absolute URL")
+      guard let url = safeCalendarEventURL(value) else {
+        throw EventCLIError.invalidInput("--url must be an absolute URL with a safe scheme")
       }
       return url
     }

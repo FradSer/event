@@ -328,7 +328,8 @@
         _ = try await service.updateEvent(
           id: localId, title: item.title, startDate: item.startDate, endDate: item.endDate,
           location: item.location, notes: item.notes, url: item.url,
-          availability: writeFields.availability, alarmMinutes: writeFields.alarmMinutes,
+          availability: writeFields.availability, skipUnsupportedAvailability: true,
+          alarmMinutes: writeFields.alarmMinutes,
           timeZoneIdentifier: item.syncTimeZoneIdentifier,
           clearTimeZone: item.shouldClearTimeZoneOnSync,
           dateFormatVersion: item.dateFormatVersion)
@@ -337,7 +338,8 @@
         let created = try await service.createEvent(
           title: item.title, startDate: item.startDate, endDate: item.endDate,
           calendarName: item.calendar, location: item.location, notes: item.notes, url: item.url,
-          availability: writeFields.availability, alarmMinutes: writeFields.alarmMinutes,
+          availability: writeFields.availability, skipUnsupportedAvailability: true,
+          alarmMinutes: writeFields.alarmMinutes,
           timeZoneIdentifier: item.syncTimeZoneIdentifier,
           dateFormatVersion: item.dateFormatVersion)
         return created.id

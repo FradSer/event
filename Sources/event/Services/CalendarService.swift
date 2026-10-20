@@ -73,6 +73,7 @@
       notes: String? = nil,
       url: String? = nil,
       availability: CalendarEventAvailability? = nil,
+      skipUnsupportedAvailability: Bool = false,
       alarmMinutes: [Int]? = nil,
       timeZoneIdentifier: String? = nil,
       dateFormatVersion: Int? = CalendarEvent.currentDateFormatVersion
@@ -138,14 +139,15 @@
       }
 
       if let availability = availability {
-        let (eventValue, mask) = Self.eventKitAvailability(for: availability)
-        guard let calendar = ekEvent.calendar,
-          calendar.supportedEventAvailabilities.contains(mask)
-        else {
-          throw EventCLIError.invalidInput(
-            "The selected calendar does not support availability settings")
+        let eventValue = try Self.availabilityValueForWrite(
+          availability,
+          supportedAvailabilities: ekEvent.calendar?.supportedEventAvailabilities,
+          skipUnsupportedAvailability: skipUnsupportedAvailability,
+          unsupportedMessage: "The selected calendar does not support availability settings"
+        )
+        if let eventValue {
+          ekEvent.availability = eventValue
         }
-        ekEvent.availability = eventValue
       }
 
       try eventStore.save(ekEvent, span: .thisEvent, commit: true)
@@ -163,6 +165,7 @@
       url: String? = nil,
       clearURL: Bool = false,
       availability: CalendarEventAvailability? = nil,
+      skipUnsupportedAvailability: Bool = false,
       alarmMinutes: [Int]? = nil,
       addAlarmMinutes: [Int]? = nil,
       timeZoneIdentifier: String? = nil,
@@ -235,14 +238,15 @@
       }
 
       if let availability = availability {
-        let (eventValue, mask) = Self.eventKitAvailability(for: availability)
-        guard let calendar = ekEvent.calendar,
-          calendar.supportedEventAvailabilities.contains(mask)
-        else {
-          throw EventCLIError.invalidInput(
-            "The event's calendar does not support availability settings")
+        let eventValue = try Self.availabilityValueForWrite(
+          availability,
+          supportedAvailabilities: ekEvent.calendar?.supportedEventAvailabilities,
+          skipUnsupportedAvailability: skipUnsupportedAvailability,
+          unsupportedMessage: "The event's calendar does not support availability settings"
+        )
+        if let eventValue {
+          ekEvent.availability = eventValue
         }
-        ekEvent.availability = eventValue
       }
 
       // Replace alarms when provided (minutes before start). [] clears all.
@@ -376,6 +380,24 @@
       case .tentative: (.tentative, .tentative)
       case .unavailable: (.unavailable, .unavailable)
       }
+    }
+
+    static func availabilityValueForWrite(
+      _ availability: CalendarEventAvailability,
+      supportedAvailabilities: EKCalendarEventAvailabilityMask?,
+      skipUnsupportedAvailability: Bool,
+      unsupportedMessage: String
+    ) throws -> EKEventAvailability? {
+      let (eventValue, mask) = eventKitAvailability(for: availability)
+      guard let supportedAvailabilities,
+        supportedAvailabilities.contains(mask)
+      else {
+        if skipUnsupportedAvailability {
+          return nil
+        }
+        throw EventCLIError.invalidInput(unsupportedMessage)
+      }
+      return eventValue
     }
   }
 

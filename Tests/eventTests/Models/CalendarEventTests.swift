@@ -25,11 +25,13 @@
     func testCalendarEventFallbackValues() {
       let ekEvent = EKEvent(eventStore: store)
       ekEvent.title = "Holiday"
+      ekEvent.availability = .notSupported
 
       let event = CalendarEvent(from: ekEvent, preferredTimeZone: utc)
 
       XCTAssertEqual(event.title, "Holiday")
       XCTAssertEqual(event.calendar, "Unknown")
+      XCTAssertEqual(event.availability, "notSupported")
     }
 
     func testCalendarEventUsesEventTimezoneForTimedDatesByDefault() throws {

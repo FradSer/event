@@ -2,6 +2,12 @@ import ArgumentParser
 import EventModels
 import Foundation
 
+extension CalendarEventAvailability: ExpressibleByArgument {
+  public init?(argument: String) {
+    self.init(rawValue: argument.lowercased())
+  }
+}
+
 // MARK: - Calendar Commands
 
 struct CalendarCommands: AsyncParsableCommand {
@@ -145,6 +151,12 @@ struct CalendarCommands: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Event notes")
     var notes: String?
 
+    @Option(name: .long, help: "Event URL")
+    var url: String?
+
+    @Option(name: .long, help: "Scheduling availability (busy, free, tentative, unavailable)")
+    var availability: CalendarEventAvailability?
+
     @Option(
       name: .long,
       help: "Alert minutes before start (repeatable, e.g. --alarm 15 --alarm 60)"
@@ -157,6 +169,13 @@ struct CalendarCommands: AsyncParsableCommand {
     @Flag(help: "Output in JSON format")
     var json = false
 
+    func validate() throws {
+      if alarm.contains(where: { $0 < 0 }) {
+        throw ValidationError("Alarm minutes must be zero or greater.")
+      }
+      try validateEventURL(url)
+    }
+
     func run() async throws {
       #if canImport(EventKit)
         let service = CalendarService()
@@ -167,14 +186,12 @@ struct CalendarCommands: AsyncParsableCommand {
           calendarName: calendar,
           location: location,
           notes: notes,
+          url: url,
+          availability: availability,
           alarmMinutes: alarm.isEmpty ? nil : alarm,
           timeZoneIdentifier: timezone
         )
       #else
-        guard alarm.isEmpty else {
-          throw EventCLIError.invalidInput(
-            "The --alarm flag is only supported on the macOS/EventKit backend")
-        }
         let backend = try await BackendFactory.makeCalendarBackend()
         let isAllDay = Date.isAllDayFormat(start) && Date.isAllDayFormat(end)
         let params = CreateEventParams(
@@ -185,6 +202,9 @@ struct CalendarCommands: AsyncParsableCommand {
           isAllDay: isAllDay,
           location: location,
           notes: notes,
+          url: url,
+          availability: availability,
+          alarmMinutes: alarm.isEmpty ? nil : alarm,
           timeZoneIdentifier: timezone
         )
         let event = try await backend.createEvent(params)
@@ -224,6 +244,15 @@ struct CalendarCommands: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "New notes")
     var notes: String?
 
+    @Option(name: .long, help: "New event URL")
+    var url: String?
+
+    @Flag(name: .long, help: "Remove the event URL")
+    var clearURL = false
+
+    @Option(name: .long, help: "Scheduling availability (busy, free, tentative, unavailable)")
+    var availability: CalendarEventAvailability?
+
     @Option(
       name: .long,
       help: "Replace all alerts with these minutes-before-start (repeatable)"
@@ -251,6 +280,13 @@ struct CalendarCommands: AsyncParsableCommand {
         throw ValidationError(
           "Use only one of --alarm, --add-alarm, or --clear-alarms.")
       }
+      if clearURL, url != nil {
+        throw ValidationError("Use only one of --url or --clear-url.")
+      }
+      if alarm.contains(where: { $0 < 0 }) || addAlarm.contains(where: { $0 < 0 }) {
+        throw ValidationError("Alarm minutes must be zero or greater.")
+      }
+      try validateEventURL(url)
     }
 
     func run() async throws {
@@ -267,15 +303,14 @@ struct CalendarCommands: AsyncParsableCommand {
           endDate: end,
           location: location,
           notes: notes,
+          url: url,
+          clearURL: clearURL,
+          availability: availability,
           alarmMinutes: alarmMinutes,
           addAlarmMinutes: addAlarmMinutes,
           timeZoneIdentifier: timezone
         )
       #else
-        guard alarm.isEmpty, addAlarm.isEmpty, !clearAlarms else {
-          throw EventCLIError.invalidInput(
-            "The --alarm/--add-alarm/--clear-alarms flags are only supported on the macOS/EventKit backend")
-        }
         let backend = try await BackendFactory.makeCalendarBackend()
         let params = UpdateEventParams(
           title: title,
@@ -283,6 +318,11 @@ struct CalendarCommands: AsyncParsableCommand {
           endDate: end,
           location: location,
           notes: notes,
+          url: url,
+          clearURL: clearURL,
+          availability: availability,
+          alarmMinutes: alarmMinutes,
+          addAlarmMinutes: addAlarmMinutes,
           timeZoneIdentifier: timezone
         )
         let event = try await backend.updateEvent(id: id, params: params)
@@ -314,5 +354,31 @@ struct CalendarCommands: AsyncParsableCommand {
       #endif
       print("Event deleted successfully")
     }
+  }
+}
+
+func safeCalendarEventURL(_ value: String) -> URL? {
+  guard let url = URL(string: value), let scheme = url.scheme?.lowercased(),
+    ["http", "https", "mailto"].contains(scheme)
+  else {
+    return nil
+  }
+
+  switch scheme {
+  case "http", "https":
+    guard let host = url.host, !host.isEmpty else { return nil }
+  case "mailto":
+    guard !url.path.isEmpty else { return nil }
+  default:
+    return nil
+  }
+
+  return url
+}
+
+private func validateEventURL(_ value: String?) throws {
+  guard let value else { return }
+  guard safeCalendarEventURL(value) != nil else {
+    throw ValidationError("Provide a valid absolute URL with a safe scheme.")
   }
 }

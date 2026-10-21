@@ -204,6 +204,16 @@
   }
 
   struct EventKitCalendarSyncSource: LocalSyncSource {
+    private static let legacyUnsupportedURLSnapshotMarker = "__eventkit_unrepresentable_url__"
+    private static let unsupportedURLSnapshotPrefix = "__eventkit_unrepresentable_url_v1__:"
+    private static let urlIndependentSnapshotVolatileKeys =
+      calendarEventSnapshotVolatileKeys.union(["url"])
+
+    private struct UnsupportedURLSnapshot: Codable, Sendable {
+      let remoteURL: String
+      let contentSnapshot: String
+    }
+
     let service: CalendarService
     let encryptor: EventEncryptor
     let window: (start: String, end: String)
@@ -234,9 +244,18 @@
         currentRemoteIds: currentRemoteIds, withinRange: range)
       let deletionTimestamps = Self.deletionTimestamps(
         discovered.deletionLastModifiedByRemoteId, for: deletionCandidates)
+      let pushableRecords = try discovered.records.compactMap { record in
+        let remoteId = context.localToRemoteId[record.id] ?? record.id
+        return try Self.pushRecord(
+          for: record, remoteId: remoteId, state: context.entityState)
+      }
+      let pushableRemoteIds = Set(
+        pushableRecords.map { context.localToRemoteId[$0.id] ?? $0.id })
       return LocalSyncChanges(
-        records: discovered.records,
-        lastModifiedByRemoteId: discovered.lastModifiedByRemoteId,
+        records: pushableRecords,
+        lastModifiedByRemoteId: discovered.lastModifiedByRemoteId.filter {
+          pushableRemoteIds.contains($0.key)
+        },
         deletionCandidates: deletionCandidates,
         deletionLastModifiedByRemoteId: deletionTimestamps)
     }
@@ -245,6 +264,117 @@
       _ timestamps: [String: String], for candidates: [String]
     ) -> [String: String] {
       timestamps.filter { candidates.contains($0.key) }
+    }
+
+    static func pushRecord(
+      for record: CalendarEvent, remoteId: String, state: SyncEntityState
+    ) throws -> CalendarEvent? {
+      guard let snapshot = state.snapshotsByRemoteId[remoteId] else { return record }
+      if snapshot == legacyUnsupportedURLSnapshotMarker {
+        // Older state saved only a marker, not the cloud URL. Keep suppressing
+        // pushes until a pull refreshes it; restoring an unknown URL is unsafe.
+        return nil
+      }
+      guard snapshot.hasPrefix(unsupportedURLSnapshotPrefix) else { return record }
+      guard let unsupportedURL = Self.decodeUnsupportedURLSnapshot(snapshot) else {
+        // Fail closed if a persisted guard cannot be decoded.
+        return nil
+      }
+
+      let localSnapshot = try SyncSnapshotEncoder.encode(
+        record, volatileKeys: urlIndependentSnapshotVolatileKeys)
+      let replacementURL = record.url.flatMap { safeCalendarEventURL($0) == nil ? nil : $0 }
+      guard localSnapshot != unsupportedURL.contentSnapshot || replacementURL != nil else {
+        return nil
+      }
+
+      return Self.copy(record, url: replacementURL ?? unsupportedURL.remoteURL)
+    }
+
+    private static func encodeUnsupportedURLSnapshot(
+      _ record: CalendarEvent, remoteURL: String
+    ) throws -> String {
+      let value = UnsupportedURLSnapshot(
+        remoteURL: remoteURL,
+        contentSnapshot: try SyncSnapshotEncoder.encode(
+          record, volatileKeys: urlIndependentSnapshotVolatileKeys))
+      let data = try JSONEncoder().encode(value)
+      return unsupportedURLSnapshotPrefix + data.base64EncodedString()
+    }
+
+    private static func decodeUnsupportedURLSnapshot(
+      _ snapshot: String
+    ) -> UnsupportedURLSnapshot? {
+      let encoded = snapshot.dropFirst(unsupportedURLSnapshotPrefix.count)
+      guard let data = Data(base64Encoded: String(encoded)),
+        let value = try? JSONDecoder().decode(UnsupportedURLSnapshot.self, from: data),
+        safeCalendarEventURL(value.remoteURL) == nil
+      else {
+        return nil
+      }
+      return value
+    }
+
+    private static func copy(_ record: CalendarEvent, url: String?) -> CalendarEvent {
+      CalendarEvent(
+        id: record.id,
+        title: record.title,
+        calendar: record.calendar,
+        startDate: record.startDate,
+        endDate: record.endDate,
+        isAllDay: record.isAllDay,
+        location: record.location,
+        notes: record.notes,
+        url: url,
+        timeZone: record.timeZone,
+        dateFormatVersion: record.dateFormatVersion,
+        creationDate: record.creationDate,
+        lastModifiedDate: record.lastModifiedDate,
+        status: record.status,
+        availability: record.availability,
+        alarms: record.alarms,
+        recurrenceRules: record.recurrenceRules,
+        attendees: record.attendees
+      )
+    }
+
+    static func urlWriteFields(for item: CalendarEvent) -> (url: String?, clearURL: Bool) {
+      guard let url = item.url, safeCalendarEventURL(url) != nil else {
+        return (nil, true)
+      }
+      return (url, false)
+    }
+
+    static func writeFields(for item: CalendarEvent) -> (
+      availability: CalendarEventAvailability?, alarmMinutes: [Int]?
+    ) {
+      (
+        availability: item.availability.flatMap(CalendarEventAvailability.init(rawValue:)),
+        alarmMinutes: alarmMinutes(from: item.alarms)
+      )
+    }
+
+    private static func alarmMinutes(from alarms: [Alarm]?) -> [Int]? {
+      guard let alarms else { return nil }
+
+      // Sync can only write relative, minute-based display alarms. Leave the
+      // local alarm set unchanged if any remote alarm cannot be represented.
+      var minutesBeforeStart = [Int]()
+      for alarm in alarms {
+        guard alarm.absoluteDate == nil,
+          alarm.locationTrigger == nil,
+          alarm.alarmType == nil || alarm.alarmType == "display",
+          let offset = alarm.relativeOffset,
+          offset.isFinite,
+          offset <= 0,
+          let minutes = Int(exactly: -offset / 60),
+          minutes >= 0
+        else {
+          return nil
+        }
+        minutesBeforeStart.append(minutes)
+      }
+      return minutesBeforeStart
     }
 
     func transformForPush(_ record: CalendarEvent) async throws -> CalendarEvent {
@@ -277,12 +407,29 @@
       _ record: CalendarEvent, remoteId: String, state: inout SyncEntityState
     ) throws {
       state.recordDateRange(record.syncDateRange(), for: remoteId)
+      try Self.recordURLPushability(for: record, remoteId: remoteId, state: &state)
     }
 
     func recordPullMetadata(
       _ record: CalendarEvent, remoteId: String, state: inout SyncEntityState
     ) throws {
       state.recordDateRange(record.syncDateRange(), for: remoteId)
+      try Self.recordURLPushability(for: record, remoteId: remoteId, state: &state)
+    }
+
+    static func recordURLPushability(
+      for record: CalendarEvent, remoteId: String, state: inout SyncEntityState
+    ) throws {
+      if let url = record.url, safeCalendarEventURL(url) == nil {
+        // EventKit cannot store this cloud URL. Keep a normalized local
+        // snapshot and the remote value so unrelated edits can still sync
+        // without replacing the cloud URL with nil or a stale local value.
+        state.snapshotsByRemoteId[remoteId] = try Self.encodeUnsupportedURLSnapshot(
+          record, remoteURL: url)
+      } else {
+        state.snapshotsByRemoteId[remoteId] = try SyncSnapshotEncoder.encode(
+          record, volatileKeys: calendarEventSnapshotVolatileKeys)
+      }
     }
 
     func acknowledgePushed(localIds: [String]) async throws {}
@@ -291,10 +438,16 @@
     func applyRemoteUpsert(
       _ item: CalendarEvent, localId: String, remoteId: String, lastModified: String
     ) async throws -> String? {
+      let writeFields = Self.writeFields(for: item)
+      let urlFields = Self.urlWriteFields(for: item)
       do {
         _ = try await service.updateEvent(
           id: localId, title: item.title, startDate: item.startDate, endDate: item.endDate,
-          location: item.location, notes: item.notes, url: item.url,
+          location: item.location, notes: item.notes, url: urlFields.url,
+          clearURL: urlFields.clearURL,
+          availability: writeFields.availability, skipUnsupportedAvailability: true,
+          skipUnsupportedURL: true,
+          alarmMinutes: writeFields.alarmMinutes,
           timeZoneIdentifier: item.syncTimeZoneIdentifier,
           clearTimeZone: item.shouldClearTimeZoneOnSync,
           dateFormatVersion: item.dateFormatVersion)
@@ -302,7 +455,11 @@
       } catch let error as EventCLIError where error.isNotFound {
         let created = try await service.createEvent(
           title: item.title, startDate: item.startDate, endDate: item.endDate,
-          calendarName: item.calendar, location: item.location, notes: item.notes, url: item.url,
+          calendarName: item.calendar, location: item.location, notes: item.notes,
+          url: urlFields.url,
+          availability: writeFields.availability, skipUnsupportedAvailability: true,
+          skipUnsupportedURL: true,
+          alarmMinutes: writeFields.alarmMinutes,
           timeZoneIdentifier: item.syncTimeZoneIdentifier,
           dateFormatVersion: item.dateFormatVersion)
         return created.id

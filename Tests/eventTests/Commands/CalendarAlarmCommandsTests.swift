@@ -6,9 +6,8 @@ import XCTest
 /// parsing of `--alarm` / `--add-alarm` / `--clear-alarms` and the
 /// mutual-exclusion validation on update.
 ///
-/// The EventKit-backed alarm application (EKAlarm creation, replace/append)
-/// requires a real calendar + permissions and is verified end-to-end against
-/// the built binary rather than here.
+/// EventKit writes are not exercised here because they would mutate a real
+/// calendar. The isolated sync-backend tests cover stored values and clears.
 final class CalendarAlarmCommandsTests: XCTestCase {
 
   private static let createBase = [
@@ -18,13 +17,50 @@ final class CalendarAlarmCommandsTests: XCTestCase {
   // MARK: - create --alarm
 
   func testCreateParsesMultipleAlarms() throws {
-    let cmd = try CalendarCommands.Create.parse(Self.createBase + ["--alarm", "15", "--alarm", "60"])
+    let cmd = try CalendarCommands.Create.parse(
+      Self.createBase + ["--alarm", "15", "--alarm", "60"])
     XCTAssertEqual(cmd.alarm, [15, 60])
   }
 
   func testCreateDefaultsToNoAlarms() throws {
     let cmd = try CalendarCommands.Create.parse(Self.createBase)
     XCTAssertTrue(cmd.alarm.isEmpty)
+  }
+
+  func testCreateParsesURLAndAvailability() throws {
+    let cmd = try CalendarCommands.Create.parse(
+      Self.createBase + [
+        "--url", "https://example.com/event",
+        "--availability", "free",
+      ])
+    XCTAssertEqual(cmd.url, "https://example.com/event")
+    XCTAssertEqual(cmd.availability?.rawValue, "free")
+  }
+
+  func testCreateRejectsNegativeAlarmMinutes() {
+    XCTAssertThrowsError(
+      try CalendarCommands.Create.parse(Self.createBase + ["--alarm", "-5"]))
+  }
+
+  func testCreateRejectsUnsafeURLScheme() {
+    for url in [
+      "javascript:alert(1)", "smb://attacker/share", "ftp://example.com/file",
+      "data:text/plain,hello", "https:///missing-host", "example.com/event",
+    ] {
+      XCTAssertThrowsError(
+        try CalendarCommands.Create.parse(Self.createBase + ["--url", url]),
+        "Expected unsafe URL to be rejected: \(url)")
+    }
+  }
+
+  func testCreateAllowsSafeURLSchemes() throws {
+    for url in [
+      "https://example.com/event", "http://example.com/event", "mailto:team@example.com",
+    ] {
+      XCTAssertNoThrow(
+        try CalendarCommands.Create.parse(Self.createBase + ["--url", url]),
+        "Expected safe URL to be accepted: \(url)")
+    }
   }
 
   // MARK: - update flag parsing
@@ -45,6 +81,28 @@ final class CalendarAlarmCommandsTests: XCTestCase {
   func testUpdateParsesClearAlarms() throws {
     let cmd = try CalendarCommands.Update.parse(["--id", "E1", "--clear-alarms"])
     XCTAssertTrue(cmd.clearAlarms)
+  }
+
+  func testUpdateParsesURLAvailabilityAndClearURL() throws {
+    let cmd = try CalendarCommands.Update.parse(
+      ["--id", "E1", "--url", "https://example.com/event", "--availability", "tentative"])
+    XCTAssertEqual(cmd.url, "https://example.com/event")
+    XCTAssertEqual(cmd.availability?.rawValue, "tentative")
+
+    let clear = try CalendarCommands.Update.parse(["--id", "E1", "--clear-url"])
+    XCTAssertTrue(clear.clearURL)
+  }
+
+  func testUpdateRejectsURLAndClearURLTogether() {
+    XCTAssertThrowsError(
+      try CalendarCommands.Update.parse([
+        "--id", "E1", "--url", "https://example.com", "--clear-url",
+      ]))
+  }
+
+  func testUpdateRejectsNegativeAlarmMinutes() {
+    XCTAssertThrowsError(
+      try CalendarCommands.Update.parse(["--id", "E1", "--add-alarm", "-5"]))
   }
 
   // MARK: - update mutual-exclusion validation

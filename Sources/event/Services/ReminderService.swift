@@ -57,7 +57,8 @@
           // Filter by due-date window (startDate inclusive, endDate exclusive).
           if let parsedWindow {
             reminders = reminders.filter {
-              DateValidator.isWithinDateWindow($0.dueDate, start: parsedWindow.start, end: parsedWindow.end)
+              DateValidator.isWithinDateWindow(
+                $0.dueDate, start: parsedWindow.start, end: parsedWindow.end)
             }
           }
 
@@ -423,7 +424,8 @@
 
   extension ReminderService: RemindersBackend {
     func fetchReminder(byId id: String) async throws -> Reminder {
-      try fetchReminder(id: id)
+      try await permissionService.ensureRemindersAccess()
+      return try fetchReminder(id: id)
     }
 
     func createReminder(_ params: CreateReminderParams) async throws -> Reminder {

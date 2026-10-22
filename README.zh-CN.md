@@ -69,6 +69,9 @@ cp .build/release/event /usr/local/bin/
 # 列出提醒事项
 event reminders list
 
+# 按 ID 读取单个提醒事项（无需扫描列表）
+event reminders get --id REMINDER_ID --json
+
 # 创建提醒事项
 event reminders create --title "购买日用品"
 

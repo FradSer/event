@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.0] - 2026-10-23
+
+### Added
+- Add `event reminders get --id` to fetch one reminder directly, without scanning the full list. The command checks Reminders authorization before the EventKit lookup.
+
 ## [0.8.0] - 2026-10-15
 
 ### Added

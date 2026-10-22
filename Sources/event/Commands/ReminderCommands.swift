@@ -8,8 +8,29 @@ struct ReminderCommands: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "reminders",
     abstract: "Manage Apple Reminders (tasks, lists, subtasks)",
-    subcommands: [List.self, Create.self, Update.self, Delete.self, Search.self, ListCommands.self]
+    subcommands: [
+      Get.self, List.self, Create.self, Update.self, Delete.self, Search.self, ListCommands.self,
+    ]
   )
+
+  struct Get: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+      abstract: "Read one reminder by ID"
+    )
+
+    @Option(name: .shortAndLong, help: "Reminder ID")
+    var id: String
+
+    @Flag(help: "Output in JSON format")
+    var json = false
+
+    func run() async throws {
+      let backend = try await BackendFactory.makeRemindersBackend()
+      let reminder = try await backend.fetchReminder(byId: id)
+      let formatter: OutputFormatter = json ? JSONFormatter() : MarkdownFormatter()
+      print(formatter.format(reminder))
+    }
+  }
 
   /// Shared `--location/--latitude/--longitude/--radius/--proximity` flags for the
   /// commands that accept a location-based alarm.

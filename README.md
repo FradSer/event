@@ -71,6 +71,9 @@ When run headless (SSH, launchd agent/daemon) the prompt cannot be displayed, so
 # List reminders
 event reminders list
 
+# Read one reminder by ID (no list scan)
+event reminders get --id REMINDER_ID --json
+
 # Create a reminder
 event reminders create --title "Buy groceries"
 

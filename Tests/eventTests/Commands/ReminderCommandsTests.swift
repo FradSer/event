@@ -3,6 +3,15 @@ import XCTest
 @testable import event
 
 final class ReminderCommandsTests: XCTestCase {
+  func testGetCommandParsesReminderIDAndJSONFlag() throws {
+    let command = try EventCLI.parseAsRoot([
+      "reminders", "get", "--id", "reminder-id", "--json",
+    ])
+
+    XCTAssertEqual((command as? ReminderCommands.Get)?.id, "reminder-id")
+    XCTAssertTrue((command as? ReminderCommands.Get)?.json ?? false)
+  }
+
   /// Regression: `--no-shortcuts` used to be declared on the root command as
   /// well as on `reminders create` / `reminders update`. ArgumentParser bound
   /// the flag to the root declaration, so the leaf flag stayed false and the

@@ -81,7 +81,7 @@ All commands support the `--json` flag to output results in JSON format, which i
 - Add/remove flag (requires Shortcut): `event reminders update --id <UUID> --flagged true` or `--flagged false`
 - Clear a date: `event reminders update --id <UUID> --clear-due` (or `--clear-start`)
 - Remove location alarms: `event reminders update --id <UUID> --clear-location`
-- Repeat rule (needs a due date; also on `create`): `event reminders update --id <UUID> --recurrence weekly --recurrence-days mon,wed` (`--recurrence` is `daily|weekly|monthly|yearly`; optional `--recurrence-interval N`, `--recurrence-end yyyy-MM-dd` or `--recurrence-count N`, `--recurrence-days-of-month` for monthly, `--recurrence-months` for yearly)
+- Repeat rule (needs a due date; also on `create`): `event reminders update --id <UUID> --recurrence weekly --recurrence-days mon,wed` (`--recurrence` is `daily|weekly|monthly|yearly`; optional `--recurrence-interval N`, `--recurrence-end yyyy-MM-dd` or `--recurrence-count N`, `--recurrence-days-of-month` for monthly, `--recurrence-months` for yearly, `--recurrence-positions` to pick among the matching days)
 - Remove a repeat rule: `event reminders update --id <UUID> --clear-recurrence`
 
 ### Delete Reminders

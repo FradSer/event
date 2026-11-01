@@ -126,11 +126,18 @@ struct ReminderCommands: AsyncParsableCommand {
     @Option(name: .long, help: "Comma-separated months (1-12) for yearly rules")
     var recurrenceMonths: String?
 
+    @Option(
+      name: .long,
+      parsing: .unconditional,
+      help: "Comma-separated positions among the matching days (1 = first, -1 = last)"
+    )
+    var recurrencePositions: String?
+
     /// `true` when any of the recurrence flags were supplied on the command line.
     var isPresent: Bool {
       recurrence != nil || recurrenceInterval != nil || recurrenceEnd != nil
         || recurrenceCount != nil || recurrenceDays != nil || recurrenceDaysOfMonth != nil
-        || recurrenceMonths != nil
+        || recurrenceMonths != nil || recurrencePositions != nil
     }
 
     static let frequencies = ["daily", "weekly", "monthly", "yearly"]
@@ -187,6 +194,18 @@ struct ReminderCommands: AsyncParsableCommand {
       if monthsOfYear != nil, frequency != "yearly" {
         throw EventCLIError.invalidInput("--recurrence-months applies to yearly rules only.")
       }
+      let setPositions = try recurrencePositions.map {
+        try Self.parseIntegers($0, flag: "--recurrence-positions", range: -366...366)
+      }
+      if let setPositions {
+        if setPositions.contains(0) {
+          throw EventCLIError.invalidInput("--recurrence-positions cannot contain 0.")
+        }
+        if daysOfWeek == nil, daysOfMonth == nil {
+          throw EventCLIError.invalidInput(
+            "--recurrence-positions needs --recurrence-days or --recurrence-days-of-month.")
+        }
+      }
 
       return RecurrenceRule(
         frequency: frequency,
@@ -196,7 +215,7 @@ struct ReminderCommands: AsyncParsableCommand {
         monthsOfYear: monthsOfYear,
         weeksOfYear: nil,
         daysOfYear: nil,
-        setPositions: nil,
+        setPositions: setPositions,
         endDate: recurrenceEnd,
         occurrenceCount: recurrenceCount
       )

@@ -51,6 +51,17 @@ final class ReminderRecurrenceCommandsTests: XCTestCase {
     XCTAssertEqual(rule.occurrenceCount, 6)
   }
 
+  func testCreateParsesFirstWeekdayOfMonth() throws {
+    let cmd = try ReminderCommands.Create.parse(
+      Self.createBase + [
+        "--recurrence", "monthly", "--recurrence-days", "mon,tue,wed,thu,fri",
+        "--recurrence-positions", "1",
+      ])
+    let rule = try XCTUnwrap(try cmd.recurrenceOptions.resolveRule())
+    XCTAssertEqual(rule.daysOfWeek, ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+    XCTAssertEqual(rule.setPositions, [1])
+  }
+
   func testCreateParsesYearlyMonths() throws {
     let cmd = try ReminderCommands.Create.parse(
       Self.createBase + ["--recurrence", "yearly", "--recurrence-months", "1,6,12"])
@@ -127,5 +138,13 @@ final class ReminderRecurrenceCommandsTests: XCTestCase {
       try resolve(["--recurrence", "monthly", "--recurrence-days-of-month", "32"]))
     XCTAssertThrowsError(try resolve(["--recurrence", "yearly", "--recurrence-months", "13"]))
     XCTAssertThrowsError(try resolve(["--recurrence", "yearly", "--recurrence-months", "x"]))
+  }
+
+  func testPositionsAreValidated() {
+    let weekdays = ["--recurrence", "monthly", "--recurrence-days", "mon,fri"]
+    XCTAssertNoThrow(try resolve(weekdays + ["--recurrence-positions", "-1"]))
+    XCTAssertThrowsError(try resolve(weekdays + ["--recurrence-positions", "0"]))
+    XCTAssertThrowsError(try resolve(weekdays + ["--recurrence-positions", "367"]))
+    XCTAssertThrowsError(try resolve(["--recurrence", "monthly", "--recurrence-positions", "1"]))
   }
 }

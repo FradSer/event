@@ -165,6 +165,17 @@
       XCTAssertEqual(RecurrenceRule(from: ekRule).occurrenceCount, 3)
     }
 
+    func testToEKRecurrenceRuleKeepsSetPositions() throws {
+      let rule = RecurrenceRule(
+        frequency: "monthly", interval: 1, daysOfWeek: ["Monday", "Friday"], daysOfMonth: nil,
+        monthsOfYear: nil, weeksOfYear: nil, daysOfYear: nil, setPositions: [1], endDate: nil)
+
+      let ekRule = try rule.toEKRecurrenceRule()
+
+      XCTAssertEqual(ekRule.setPositions?.map { $0.intValue }, [1])
+      XCTAssertEqual(RecurrenceRule(from: ekRule).setPositions, [1])
+    }
+
     func testToEKRecurrenceRuleRejectsUnknownFrequencyAndWeekday() {
       let unknownFrequency = RecurrenceRule(
         frequency: "hourly", interval: 1, daysOfWeek: nil, daysOfMonth: nil, monthsOfYear: nil,

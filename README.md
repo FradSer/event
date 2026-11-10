@@ -86,6 +86,9 @@ event reminders update --id <REMINDER_ID> --completed
 # Repeat monthly (a repeat rule needs a due date)
 event reminders create --title "Pay rent" --due "2026-10-01 09:00:00" --recurrence monthly
 
+# Repeat on the first weekday of each month
+event reminders create --title "Bank statements" --due 2026-12-01 --recurrence monthly --recurrence-days mon,tue,wed,thu,fri --recurrence-positions 1
+
 # Repeat every other Monday and Wednesday until year end; remove the rule
 event reminders update --id <REMINDER_ID> --recurrence weekly --recurrence-interval 2 --recurrence-days mon,wed --recurrence-end 2026-12-31
 event reminders update --id <REMINDER_ID> --clear-recurrence
